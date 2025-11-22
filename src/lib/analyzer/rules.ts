@@ -5,6 +5,7 @@ export interface SecurityRule {
   title: string;
   severity: Severity;
   description: string;
+  scenario: string;
   suggestion: string;
   pattern: RegExp; // The regex to match against NORMALIZED code
   invert?: boolean; // If true, the rule fails if the pattern is NOT found
@@ -16,6 +17,7 @@ export const RULES: SecurityRule[] = [
     title: "Missing Bounced Message Check",
     severity: "Medium",
     description: "Smart contracts should handle or ignore bounced messages to avoid processing them as normal transactions.",
+    scenario: "An attacker triggers a bounce (e.g., insufficient gas or error in a called contract). If unhandled, your contract might re-process this as a new deposit or command, potentially corrupting state or double-spending.",
     suggestion: "Add `if (flags & 1) { return (); }` at the start of recv_internal.",
     // Look for "flags & 1" check
     pattern: /flags\s*&\s*1/,
@@ -26,11 +28,8 @@ export const RULES: SecurityRule[] = [
     title: "Missing Owner Access Control",
     severity: "Critical",
     description: "Critical functions (like withdrawals) appear to be missing access controls.",
+    scenario: "An attacker calls a privileged function (e.g., change_owner, withdraw). Without an `equal_slices(sender, owner)` check, the contract executes the command, allowing full takeover or fund drainage.",
     suggestion: "Ensure you check `equal_slices(sender_address, owner_address)` before processing privileged operations.",
-    // Heuristic: If we see 'withdraw' or 'send_raw_message' but NO 'equal_slices' or 'owner' check nearby
-    // This is tricky with pure regex on the whole file. 
-    // A safer deterministic rule: If the code uses storage variables but never compares strings/addresses.
-    // Let's try: If code contains "total_balance" logic but NO "equal_slices"
     pattern: /equal_slices/i,
     invert: true
   },
@@ -39,7 +38,8 @@ export const RULES: SecurityRule[] = [
     title: "Unchecked Message Sending",
     severity: "High",
     description: "The contract sends raw messages. Ensure the mode (e.g., 128, 64) is correct to avoid draining the balance.",
-    suggestion: "Verify the second argument of `send_raw_message`.",
+    scenario: "A contract sends funds using a mode like 128 (carry all balance) based on user input. An attacker exploits this to drain the entire contract balance in a single transaction.",
+    suggestion: "Verify the second argument of `send_raw_message`. Use mode 64 for returning change, or explicit amounts.",
     pattern: /send_raw_message\s*\(\s*[^,]+,\s*(0|1|2)\s*\)/, // Warn if mode is low/dangerous without careful checks
   },
   {
@@ -47,9 +47,9 @@ export const RULES: SecurityRule[] = [
     title: "Potential Unprotected Withdrawal",
     severity: "Critical",
     description: "Detected a pattern resembling the 'TipJar' bug: balance subtraction without obvious authority checks.",
+    scenario: "The contract subtracts from `total_balance` based on a user request (op=2). However, no `throw_unless` checks the sender's identity. Any user can simply request a withdrawal and drain the pot.",
     suggestion: "Add `throw_unless(401, equal_slices(sender_address, owner_address));` before modifying the balance.",
     // Look for subtraction of balance AND send_raw_message
     pattern: /total_balance\s*-=|send_raw_message/
   }
 ];
-

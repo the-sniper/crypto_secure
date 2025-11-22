@@ -1,8 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, AlertTriangle, Zap, Code, Lock, Terminal } from "lucide-react";
 import Link from "next/link";
-import { CodeAnalyzer } from "@/components/code-analyzer";
 
 export default function Home() {
   return (
@@ -18,7 +17,7 @@ export default function Home() {
             <Link href="#problem" className="text-sm font-medium hover:text-blue-600">The Problem</Link>
             <Link href="#how-it-works" className="text-sm font-medium hover:text-blue-600">How it Works</Link>
           </nav>
-          <Link href="#audit">
+          <Link href="/auditor">
             <Button>Get Started</Button>
           </Link>
         </div>
@@ -39,19 +38,12 @@ export default function Home() {
               Detect vulnerabilities before hackers do.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="#audit">
+              <Link href="/auditor">
                 <Button size="lg" className="h-12 px-8 text-lg">
                   Audit My Code
                 </Button>
               </Link>
             </div>
-          </div>
-        </section>
-
-        {/* Audit Tool Section */}
-        <section id="audit" className="py-12 px-4 bg-white border-y scroll-mt-20">
-          <div className="container mx-auto">
-            <CodeAnalyzer />
           </div>
         </section>
 
@@ -182,7 +174,7 @@ export default function Home() {
             <p className="text-xl text-neutral-400 mb-8">
               Get a free security check for your TON smart contract today.
             </p>
-            <Link href="#audit">
+            <Link href="/auditor">
               <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white h-14 px-10 text-lg">
                 Start Free Audit
               </Button>
