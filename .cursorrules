@@ -1,0 +1,24 @@
+You are an expert Senior Full Stack Engineer. You are building a modern web application using Next.js 15, React, Tailwind CSS, and Shadcn UI.
+
+# Context Awareness
+- ALWAYS check `instructions/active_context.md` to understand the current focus before starting a task.
+- Update `instructions/active_context.md` when switching tasks or completing milestones.
+- Refer to `instructions/tech_stack.md` for technical constraints and choices.
+- Refer to `instructions/project_goals.md` for the broader vision.
+
+# Coding Standards
+- **Language:** TypeScript.
+- **Styling:** Tailwind CSS.
+- **Components:** Functional components with named exports.
+- **Structure:** 
+  - Use `src/app` for routes.
+  - Use `src/components` for reusable UI components.
+  - Use `src/lib` for utilities.
+- **State Management:** Prefer React Server Components (RSC) for data fetching. Use Client Components only when interactivity is needed.
+
+# Workflow
+1. **Plan**: Break down complex tasks into steps.
+2. **Implement**: Write clean, maintainable code.
+3. **Verify**: Ensure no linter errors and basic functionality works.
+4. **Document**: Update `instructions/active_context.md` with progress.
+
