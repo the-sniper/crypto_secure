@@ -10,15 +10,18 @@ import {
   Loader2, 
   Bug, 
   ShieldAlert, 
-  Info, Upload, FileCode, X, FileText, Circle, 
+  Info, 
   ChevronDown, 
   ChevronUp, 
   AlertOctagon,
   Wand2,
-  Pencil
+  Pencil,
+  Upload,
+  FileCode,
+  X,
+  FileText
 } from "lucide-react";
 import { AnalysisResult, Vulnerability } from "@/types/analysis";
-import { AnalysisChat } from "@/components/analysis-chat";
 import { CodeDiffViewer } from "@/components/code-diff-viewer";
 
 // Internal Component for Severity Section (Accordion)
@@ -238,37 +241,7 @@ export function CodeAnalyzer() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  const [showDiff, setShowDiff] = useState(false);
-  const [isEditingFix, setIsEditingFix] = useState(false);
-  const [modifiedFix, setModifiedFix] = useState("");
-
-  // Refs for sync scrolling
-  const diffViewerRef = useRef<{ scrollTo: (top: number) => void }>(null);
-  const editorRef = useRef<HTMLTextAreaElement>(null);
-  const isScrollingRef = useRef<boolean>(false);
-
-  const handleDiffScroll = (e: React.UIEvent<HTMLDivElement>) => {
-      if (isScrollingRef.current) return;
-      isScrollingRef.current = true;
-      if (editorRef.current) {
-          editorRef.current.scrollTop = e.currentTarget.scrollTop;
-      }
-      // Reset lock after a short delay to allow other scroll event to fire if needed,
-      // but for 1-way binding usually we want to avoid loop.
-      // Actually, better to use requestAnimationFrame or simple timeout
-      setTimeout(() => { isScrollingRef.current = false; }, 10);
-  };
-
-  const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-      if (isScrollingRef.current) return;
-      isScrollingRef.current = true;
-      if (diffViewerRef.current) {
-          diffViewerRef.current.scrollTo(e.currentTarget.scrollTop);
-      }
-      setTimeout(() => { isScrollingRef.current = false; }, 10);
-  };
-
-  // Progress steps for analysis - aligned with actual analysis process
+  // Progress steps
   const progressSteps = [
     { 
       title: "Parsing contract code", 
@@ -291,6 +264,17 @@ export function CodeAnalyzer() {
       duration: 1500 
     },
   ];
+
+  const [showDiff, setShowDiff] = useState(false);
+  const [isEditingFix, setIsEditingFix] = useState(false);
+  const [modifiedFix, setModifiedFix] = useState("");
+
+  // Refs for sync scrolling
+  const diffViewerRef = useRef<{ scrollTo: (top: number) => void }>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const isScrollingRef = useRef<boolean>(false);
+
+  // Upload/Snippet State
   const [activeTab, setActiveTab] = useState<"upload" | "snippet">("upload");
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -413,6 +397,24 @@ export function CodeAnalyzer() {
     }
   };
 
+  const handleDiffScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      if (editorRef.current) {
+          editorRef.current.scrollTop = e.currentTarget.scrollTop;
+      }
+      setTimeout(() => { isScrollingRef.current = false; }, 10);
+  };
+
+  const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      if (diffViewerRef.current) {
+          diffViewerRef.current.scrollTo(e.currentTarget.scrollTop);
+      }
+      setTimeout(() => { isScrollingRef.current = false; }, 10);
+  };
+
   const handleAnalyze = async () => {
     const currentCode = getCurrentCode();
     if (!currentCode.trim() || !canScan()) {
@@ -447,7 +449,7 @@ export function CodeAnalyzer() {
     try {
       progressCancelledRef.current = false;
       
-      // Start progress simulation (runs independently, doesn't block API)
+      // Start progress simulation
       const progressPromise = (async () => {
         for (let i = 0; i < progressSteps.length; i++) {
           if (progressCancelledRef.current) break;
@@ -459,7 +461,6 @@ export function CodeAnalyzer() {
         }
       })();
 
-      // Make API call - this is what we actually wait for
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -476,7 +477,6 @@ export function CodeAnalyzer() {
       progressCancelledRef.current = true;
       setCurrentStep(progressSteps.length - 1);
       
-      // Artificial 2 second delay to show progress indicator
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       setResult(data);
@@ -517,302 +517,370 @@ export function CodeAnalyzer() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-            {!showDiff ? (
-          <>
-          {/* Tabs */}
-          <div className="flex gap-1 border-b border-neutral-200">
-            <button
-              onClick={() => handleTabSwitch("upload")}
-              className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === "upload"
-                  ? "border-purple-600 text-purple-600 bg-purple-50"
-                  : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-              }`}
-            >
-              <Upload className="h-4 w-4" />
-              Upload
-            </button>
-            <button
-              onClick={() => handleTabSwitch("snippet")}
-              className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
-                activeTab === "snippet"
-                  ? "border-purple-600 text-purple-600 bg-purple-50"
-                  : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
-              }`}
-            >
-              <FileCode className="h-4 w-4" />
-              Snippet
-            </button>
-          </div>
-
-          {/* Scan in Progress - Replaces upload/snippet area */}
-          {isAnalyzing ? (
-            <div className="border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
-              <div className="w-full max-w-xl space-y-6">
-                <div>
-                  <h3 className="text-xl font-semibold text-neutral-900 mb-1">Scan in progress...</h3>
-                  <p className="text-sm text-neutral-600">Analyzing your smart contract for security vulnerabilities</p>
-                </div>
-                
-                <div className="space-y-0">
-                  {progressSteps.map((step, index) => {
-                    const isActive = index === currentStep;
-                    const isCompleted = index < currentStep;
-                    const isPending = index > currentStep;
-                    const isLast = index === progressSteps.length - 1;
-                    
-                    return (
-                      <div key={index} className="flex items-start gap-3">
-                        {/* Progress Indicator */}
-                        <div className="flex flex-col items-center flex-shrink-0">
-                          {isCompleted ? (
-                            <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
-                              <CheckCircle className="h-3.5 w-3.5 text-white" />
-                            </div>
-                          ) : isActive ? (
-                            <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
-                              <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
-                            </div>
-                          ) : (
-                            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-white"></div>
-                          )}
-                          {/* Simple connecting line */}
-                          {!isLast && (
-                            <div className={`w-0.5 h-6 mt-1.5 ${
-                              isCompleted ? "bg-green-600" : "bg-neutral-200"
-                            }`}></div>
-                          )}
-                        </div>
-                        
-                        {/* Step Content */}
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium leading-tight ${
-                            isActive ? "text-purple-700" : 
-                            isCompleted ? "text-green-700" : 
-                            "text-neutral-400"
-                          }`}>
-                            {step.title}
-                          </p>
-                          {step.description && isActive && (
-                            <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{step.description}</p>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
+          {/* Editor Section - Replaced with Upload/Snippet UI */}
+          {!showDiff ? (
             <>
-              {/* Upload Tab */}
-              {activeTab === "upload" && (
-            <div
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              className={`relative border-2 border-dashed rounded-lg p-8 transition-colors h-[300px] flex items-center justify-center ${
-                isDragging
-                  ? "border-purple-500 bg-purple-50"
-                  : "border-purple-300 bg-neutral-50"
-              }`}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".tact,.fc,.func"
-                onChange={handleFileInputChange}
-                className="hidden"
-              />
-              
-              {uploadedFile ? (
-                <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                  <div className="w-full max-w-md bg-white rounded-lg border border-neutral-200 shadow-sm overflow-hidden">
-                    {/* File Header - Vertical Layout */}
-                    <div className="flex items-start gap-3 px-4 py-3">
-                      <div className="p-1.5 bg-purple-100 rounded flex-shrink-0">
-                        <FileText className="h-4 w-4 text-purple-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-semibold text-neutral-900 truncate text-sm">{uploadedFile.name}</p>
-                          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded whitespace-nowrap">
-                            Contract
-                          </span>
-                          <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
-                        </div>
-                        <p className="text-xs text-neutral-500 mb-1">
-                          {(uploadedFile.size / 1024).toFixed(2)} KB
-                        </p>
-                        <p className="text-xs text-green-700 font-medium">
-                          Valid {uploadedFile.name.split('.').pop()?.toUpperCase()} file
-                        </p>
-                      </div>
-                      <button
-                        onClick={handleRemoveFile}
-                        className="p-1 hover:bg-neutral-100 rounded transition-colors flex-shrink-0"
-                        title="Remove file"
-                      >
-                        <X className="h-4 w-4 text-neutral-500" />
-                      </button>
+              {/* Tabs */}
+              <div className="flex gap-1 border-b border-neutral-200">
+                <button
+                  onClick={() => handleTabSwitch("upload")}
+                  className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
+                    activeTab === "upload"
+                      ? "border-purple-600 text-purple-600 bg-purple-50"
+                      : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+                  }`}
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload
+                </button>
+                <button
+                  onClick={() => handleTabSwitch("snippet")}
+                  className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
+                    activeTab === "snippet"
+                      ? "border-purple-600 text-purple-600 bg-purple-50"
+                      : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
+                  }`}
+                >
+                  <FileCode className="h-4 w-4" />
+                  Snippet
+                </button>
+              </div>
+
+              {/* Scan in Progress */}
+              {isAnalyzing ? (
+                <div className="border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
+                  <div className="w-full max-w-xl space-y-6">
+                    <div>
+                      <h3 className="text-xl font-semibold text-neutral-900 mb-1">Scan in progress...</h3>
+                      <p className="text-sm text-neutral-600">Analyzing your smart contract for security vulnerabilities</p>
                     </div>
                     
-                    {/* Progress Bar */}
-                    <div className="h-1 bg-green-200">
-                      <div className="h-full bg-green-600 w-full"></div>
+                    <div className="space-y-0">
+                      {progressSteps.map((step, index) => {
+                        const isActive = index === currentStep;
+                        const isCompleted = index < currentStep;
+                        const isPending = index > currentStep;
+                        const isLast = index === progressSteps.length - 1;
+                        
+                        return (
+                          <div key={index} className="flex items-start gap-3">
+                            {/* Progress Indicator */}
+                            <div className="flex flex-col items-center flex-shrink-0">
+                              {isCompleted ? (
+                                <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
+                                  <CheckCircle className="h-3.5 w-3.5 text-white" />
+                                </div>
+                              ) : isActive ? (
+                                <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
+                                  <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-white"></div>
+                              )}
+                              {!isLast && (
+                                <div className={`w-0.5 h-6 mt-1.5 ${
+                                  isCompleted ? "bg-green-600" : "bg-neutral-200"
+                                }`}></div>
+                              )}
+                            </div>
+                            
+                            {/* Step Content */}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium leading-tight ${
+                                isActive ? "text-purple-700" : 
+                                isCompleted ? "text-green-700" : 
+                                "text-neutral-400"
+                              }`}>
+                                {step.title}
+                              </p>
+                              {step.description && isActive && (
+                                <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{step.description}</p>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                  
-                  <p className="text-sm text-neutral-600 mt-3">
-                    File loaded successfully. Click "Scan for Bugs" to analyze.
-                  </p>
                 </div>
               ) : (
-                <div className="text-center space-y-4 w-full">
-                  <div className="flex justify-center">
-                    <div className="p-4 bg-purple-100 rounded-full">
-                      <Upload className="h-8 w-8 text-purple-600" />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-lg font-medium text-neutral-900 mb-2">Drop files here</p>
-                    <p className="text-sm text-neutral-600 mb-4">
-                      Attach contract files (.tact, .fc, .func) up to 1MB
-                    </p>
-                    <Button
-                      onClick={() => fileInputRef.current?.click()}
-                      variant="outline"
-                      className="text-purple-600 border-purple-300 hover:bg-purple-50"
-                    >
-                      Click to upload
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Error: Upload tab errors - below the upload box */}
-          {error && activeTab === "upload" && !isAnalyzing && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700 font-medium">{error}</p>
-            </div>
-          )}
-
-          {/* Snippet Tab */}
-          {activeTab === "snippet" && !isAnalyzing && (
-            <div className="space-y-3">
-              {/* Language Selector */}
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-neutral-700">Language:</label>
-                <div className="flex gap-2">
-                  {ALLOWED_LANGUAGES.map((lang) => (
-                    <button
-                      key={lang}
-                      onClick={() => {
-                        // If switching to a different language, always clear the code and errors
-                        if (snippetLanguage !== lang) {
-                          setSnippetCode("");
-                          setCodeValidationError(null);
-                          setError(null);
-                        }
-                        setSnippetLanguage(lang);
-                      }}
-                      className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
-                        snippetLanguage === lang
-                          ? "bg-purple-600 text-white"
-                          : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                <>
+                  {/* Upload Tab */}
+                  {activeTab === "upload" && (
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      className={`relative border-2 border-dashed rounded-lg p-8 transition-colors h-[300px] flex items-center justify-center ${
+                        isDragging
+                          ? "border-purple-500 bg-purple-50"
+                          : "border-purple-300 bg-neutral-50"
                       }`}
                     >
-                      {lang.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <Textarea
-                placeholder="// Paste your smart contract code here..."
-                className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-purple-500 focus-visible:ring-purple-500/20 focus-visible:ring-[2px]"
-                value={snippetCode}
-                onChange={(e) => {
-                  setSnippetCode(e.target.value);
-                  const code = e.target.value.trim();
-                  
-                  // Validate code matches selected language
-                  if (code && snippetLanguage && isValidLanguage(snippetLanguage)) {
-                    const validation = validateCodeLanguage(code, snippetLanguage);
-                    if (!validation.valid) {
-                      const errorMsg = validation.message || "Code language doesn't match selected language.";
-                      setCodeValidationError(errorMsg);
-                      setError(errorMsg);
-                    } else {
-                      setCodeValidationError(null);
-                      setError(null);
-                    }
-                  } else if (code && !snippetLanguage) {
-                    setCodeValidationError(null);
-                    setError(null); // Clear error, will show warning below
-                  } else {
-                    setCodeValidationError(null);
-                    setError(null);
-                  }
-                }}
-              />
-              
-              {/* Warning: Language not selected */}
-              {snippetCode.trim() && (!snippetLanguage || !isValidLanguage(snippetLanguage)) && !error && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                  <p className="text-sm text-amber-700 font-medium">
-                    Please select a language type (Tact, FC, or Func) to proceed with analysis.
-                  </p>
-                </div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".tact,.fc,.func"
+                        onChange={handleFileInputChange}
+                        className="hidden"
+                      />
+                      
+                      {uploadedFile ? (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-4">
+                          <div className="w-full max-w-md bg-white rounded-lg border border-neutral-200 shadow-sm overflow-hidden">
+                            <div className="flex items-start gap-3 px-4 py-3">
+                              <div className="p-1.5 bg-purple-100 rounded flex-shrink-0">
+                                <FileText className="h-4 w-4 text-purple-600" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="font-semibold text-neutral-900 truncate text-sm">{uploadedFile.name}</p>
+                                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded whitespace-nowrap">
+                                    Contract
+                                  </span>
+                                  <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+                                </div>
+                                <p className="text-xs text-neutral-500 mb-1">
+                                  {(uploadedFile.size / 1024).toFixed(2)} KB
+                                </p>
+                                <p className="text-xs text-green-700 font-medium">
+                                  Valid {uploadedFile.name.split('.').pop()?.toUpperCase()} file
+                                </p>
+                              </div>
+                              <button
+                                onClick={handleRemoveFile}
+                                className="p-1 hover:bg-neutral-100 rounded transition-colors flex-shrink-0"
+                                title="Remove file"
+                              >
+                                <X className="h-4 w-4 text-neutral-500" />
+                              </button>
+                            </div>
+                            <div className="h-1 bg-green-200">
+                              <div className="h-full bg-green-600 w-full"></div>
+                            </div>
+                          </div>
+                          <p className="text-sm text-neutral-600 mt-3">
+                            File loaded successfully. Click "Scan for Bugs" to analyze.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="text-center space-y-4 w-full">
+                          <div className="flex justify-center">
+                            <div className="p-4 bg-purple-100 rounded-full">
+                              <Upload className="h-8 w-8 text-purple-600" />
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-lg font-medium text-neutral-900 mb-2">Drop files here</p>
+                            <p className="text-sm text-neutral-600 mb-4">
+                              Attach contract files (.tact, .fc, .func) up to 1MB
+                            </p>
+                            <Button
+                              onClick={() => fileInputRef.current?.click()}
+                              variant="outline"
+                              className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                            >
+                              Click to upload
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error: Upload tab errors */}
+                  {error && activeTab === "upload" && !isAnalyzing && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-700 font-medium">{error}</p>
+                    </div>
+                  )}
+
+                  {/* Snippet Tab */}
+                  {activeTab === "snippet" && !isAnalyzing && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm font-medium text-neutral-700">Language:</label>
+                        <div className="flex gap-2">
+                          {ALLOWED_LANGUAGES.map((lang) => (
+                            <button
+                              key={lang}
+                              onClick={() => {
+                                if (snippetLanguage !== lang) {
+                                  setSnippetCode("");
+                                  setCodeValidationError(null);
+                                  setError(null);
+                                }
+                                setSnippetLanguage(lang);
+                              }}
+                              className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
+                                snippetLanguage === lang
+                                  ? "bg-purple-600 text-white"
+                                  : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
+                              }`}
+                            >
+                              {lang.toUpperCase()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <Textarea
+                        placeholder="// Paste your smart contract code here..."
+                        className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-purple-500 focus-visible:ring-purple-500/20 focus-visible:ring-[2px]"
+                        value={snippetCode}
+                        onChange={(e) => {
+                          setSnippetCode(e.target.value);
+                          const code = e.target.value.trim();
+                          if (code && snippetLanguage && isValidLanguage(snippetLanguage)) {
+                            const validation = validateCodeLanguage(code, snippetLanguage);
+                            if (!validation.valid) {
+                              const errorMsg = validation.message || "Code language doesn't match selected language.";
+                              setCodeValidationError(errorMsg);
+                              setError(errorMsg);
+                            } else {
+                              setCodeValidationError(null);
+                              setError(null);
+                            }
+                          } else {
+                            setCodeValidationError(null);
+                            setError(null);
+                          }
+                        }}
+                      />
+                      
+                      {snippetCode.trim() && (!snippetLanguage || !isValidLanguage(snippetLanguage)) && !error && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                          <p className="text-sm text-amber-700 font-medium">
+                            Please select a language type (Tact, FC, or Func) to proceed with analysis.
+                          </p>
+                        </div>
+                      )}
+                      
+                      {error && activeTab === "snippet" && !isAnalyzing && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                          <p className="text-sm text-red-700 font-medium">{error}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
-              
-              {/* Error: Code validation or other snippet errors */}
-              {error && activeTab === "snippet" && !isAnalyzing && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <p className="text-sm text-red-700 font-medium">{error}</p>
-                </div>
-              )}
+            </>
+          ) : (
+             <div className="animate-in fade-in slide-in-from-bottom-4">
+                 {isEditingFix ? (
+                     <div className="space-y-4">
+                         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                             <Info className="h-4 w-4" />
+                             You are editing the proposed fix. The diff view on the left updates in real-time as you type.
+                         </div>
+                         
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[600px]">
+                            <div className="space-y-2 overflow-hidden h-full flex flex-col">
+                                <span className="text-xs font-bold uppercase text-neutral-500 tracking-wider">Live Diff Preview</span>
+                                <div className="flex-1 overflow-hidden">
+                                    <CodeDiffViewer 
+                                        ref={diffViewerRef}
+                                        originalCode={getCurrentCode()} 
+                                        patchedCode={modifiedFix} 
+                                        onScroll={handleDiffScroll}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2 h-full flex flex-col">
+                                <span className="text-xs font-bold uppercase text-blue-600 tracking-wider">Proposed Code (Editable)</span>
+                                <div className="rounded-md border bg-neutral-950 font-mono text-sm overflow-hidden shadow-2xl h-full flex flex-col">
+                                    <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-neutral-900 border-b border-neutral-800">
+                                        <span className="text-xs font-bold text-neutral-400 tracking-wider">EDITOR</span>
+                                        <div className="text-xs text-neutral-500">Editable</div>
+                                    </div>
+                                    <textarea
+                                        ref={editorRef}
+                                        className="flex-1 w-full bg-transparent text-neutral-300 p-4 resize-none focus:outline-none font-mono text-sm leading-relaxed"
+                                        value={modifiedFix}
+                                        onChange={(e) => setModifiedFix(e.target.value)}
+                                        onScroll={handleEditorScroll}
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            </div>
+                         </div>
+
+                         <div className="flex justify-end gap-3 pt-4">
+                             <Button variant="outline" onClick={() => setIsEditingFix(false)}>
+                                 Cancel Edit
+                             </Button>
+                             <Button onClick={() => setIsEditingFix(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                 Preview Final Diff
+                             </Button>
+                         </div>
+                     </div>
+                 ) : (
+                     <>
+                        <CodeDiffViewer originalCode={getCurrentCode()} patchedCode={modifiedFix} />
+                        <div className="flex justify-between items-center mt-4">
+                            <Button variant="outline" onClick={() => setIsEditingFix(true)} className="border-neutral-300">
+                                <Pencil className="mr-2 h-4 w-4" /> Edit Proposed Code
+                            </Button>
+                            <div className="flex gap-3">
+                                <Button variant="ghost" onClick={() => setShowDiff(false)}>
+                                    Deny / Cancel
+                                </Button>
+                                <Button onClick={handleAcceptFix} className="bg-green-600 hover:bg-green-700 text-white">
+                                    <CheckCircle className="mr-2 h-4 w-4" /> Accept Fixes
+                                </Button>
+                            </div>
+                        </div>
+                     </>
+                 )}
+             </div>
+          )}
+          
+          {!showDiff && (
+            <div className="flex justify-end gap-3">
+                {result && result.patchedCode && result.vulnerabilities.length > 0 && (
+                    <Button 
+                        variant="outline"
+                        onClick={handleReviewClick}
+                        className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                    >
+                        <Wand2 className="mr-2 h-4 w-4" />
+                        Review Auto-Fixes
+                    </Button>
+                )}
+                <Button 
+                onClick={handleAnalyze} 
+                disabled={isAnalyzing || !canScan()}
+                size="lg"
+                className="w-full sm:w-auto"
+                >
+                {isAnalyzing ? (
+                    <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing Logic...
+                    </>
+                ) : (
+                    "Scan for Bugs"
+                )}
+                </Button>
             </div>
           )}
-            </>
-          )}
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleAnalyze} 
-              disabled={isAnalyzing || !canScan()}
-              size="lg"
-              className="w-full sm:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing Logic...
-                </>
-              ) : (
-                "Scan for Bugs"
-              )}
-            </Button>
-          </div>
 
-          {result && (
+          {error && !activeTab && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-800">
+              <ShieldAlert className="h-5 w-5" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {result && !showDiff && (
             <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
               
               {/* 1. Executive Summary & Score */}
               <div className="grid gap-6 md:grid-cols-[1fr_200px]">
                 <div className="p-5 rounded-xl border bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-900 dark:to-neutral-950 shadow-sm">
                   <h3 className="font-bold text-lg mb-2">Scan Results</h3>
-                  <p className="text-neutral-600 dark:text-neutral-400 mb-4">{result.summary}</p>
-                  {result.patchedCode && (
-                    <Button 
-                      onClick={handleReviewClick} 
-                      className="gap-2 bg-purple-600 hover:bg-purple-700 text-white shadow-sm"
-                    >
-                      <Wand2 className="h-4 w-4" /> 
-                      Review Auto-Fixes
-                    </Button>
-                  )}
+                  <p className="text-neutral-600 dark:text-neutral-400">{result.summary}</p>
                 </div>
                 <div className={`p-5 rounded-xl border flex flex-col items-center justify-center ${
                   result.score > 80 ? "bg-green-50 border-green-200 text-green-700" :
@@ -843,9 +911,6 @@ export function CodeAnalyzer() {
                   <span className="text-xs text-blue-600/80 dark:text-blue-400/80 uppercase font-bold tracking-wider mt-1">Low</span>
                 </div>
               </div>
-
-              {/* Chat Interface */}
-              <AnalysisChat />
 
               {/* 3. Detailed Findings (Accordions) */}
               <div>
@@ -904,58 +969,6 @@ export function CodeAnalyzer() {
 
             </div>
           )}
-          </>
-        ) : (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
-             <div className="flex items-center justify-between mb-4">
-               <div>
-                 <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Review Security Patch</h3>
-                 <p className="text-sm text-neutral-500">Review the AI-generated fix and make manual adjustments if needed.</p>
-               </div>
-               <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowDiff(false)}>Cancel</Button>
-                  <Button onClick={handleAcceptFix} className="bg-green-600 hover:bg-green-700 text-white">
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Apply Fix
-                  </Button>
-               </div>
-             </div>
-             
-             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
-                <div className="flex flex-col h-full border rounded-lg overflow-hidden bg-neutral-950">
-                   <div className="bg-neutral-900 px-4 py-2 border-b border-neutral-800 flex justify-between items-center">
-                      <h4 className="font-mono text-xs font-bold text-neutral-400 uppercase tracking-wider">Diff View</h4>
-                   </div>
-                   <div className="flex-1 min-h-0 relative">
-                      <CodeDiffViewer 
-                         ref={diffViewerRef}
-                         originalCode={getCurrentCode()}
-                         patchedCode={modifiedFix}
-                         onScroll={handleDiffScroll}
-                      />
-                   </div>
-                </div>
-
-                <div className="flex flex-col h-full border rounded-lg overflow-hidden bg-white dark:bg-neutral-900">
-                   <div className="bg-neutral-50 dark:bg-neutral-800 px-4 py-2 border-b border-neutral-200 dark:border-neutral-700 flex justify-between items-center">
-                      <h4 className="font-mono text-xs font-bold text-neutral-500 uppercase tracking-wider">Editable Fix</h4>
-                      <div className="flex items-center gap-2">
-                         <Pencil className="h-3 w-3 text-neutral-400" />
-                         <span className="text-xs text-neutral-400">Editable</span>
-                      </div>
-                   </div>
-                   <Textarea 
-                      ref={editorRef}
-                      value={modifiedFix}
-                      onChange={(e) => setModifiedFix(e.target.value)}
-                      onScroll={handleEditorScroll}
-                      className="flex-1 w-full h-full font-mono text-sm resize-none p-4 border-0 focus-visible:ring-0 rounded-none leading-normal"
-                      spellCheck={false}
-                   />
-                </div>
-             </div>
-           </div>
-        )}
         </CardContent>
       </Card>
     </div>
