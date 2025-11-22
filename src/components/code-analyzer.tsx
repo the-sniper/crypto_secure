@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, CheckCircle, Loader2, Bug, ShieldAlert, Info, Upload, FileCode, X, FileText } from "lucide-react";
+import { AlertTriangle, CheckCircle, Loader2, Bug, ShieldAlert, Info, Upload, FileCode, X, FileText, Circle } from "lucide-react";
 import { AnalysisResult, Vulnerability } from "@/types/analysis";
 
 // File size limit: 1MB (1024 * 1024 bytes)
@@ -121,8 +121,33 @@ const validateCodeLanguage = (code: string, selectedLanguage: string): { valid: 
 
 export function CodeAnalyzer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Progress steps for analysis - aligned with actual analysis process
+  const progressSteps = [
+    { 
+      title: "Parsing contract code", 
+      description: "Reading and validating syntax",
+      duration: 1500 
+    },
+    { 
+      title: "Analyzing contract logic", 
+      description: "Identifying functions and patterns",
+      duration: 2000 
+    },
+    { 
+      title: "Scanning for vulnerabilities", 
+      description: "Checking security patterns",
+      duration: 2500 
+    },
+    { 
+      title: "Generating security report", 
+      description: "Compiling findings",
+      duration: 1500 
+    },
+  ];
   const [activeTab, setActiveTab] = useState<"upload" | "snippet">("upload");
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -131,6 +156,7 @@ export function CodeAnalyzer() {
   const [snippetLanguage, setSnippetLanguage] = useState<LanguageType | "">("");
   const [codeValidationError, setCodeValidationError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const progressCancelledRef = useRef(false);
 
   // Clear validation errors when code is cleared
   useEffect(() => {
@@ -271,8 +297,24 @@ export function CodeAnalyzer() {
     setIsAnalyzing(true);
     setResult(null);
     setError(null);
+    setCurrentStep(0);
 
     try {
+      progressCancelledRef.current = false;
+      
+      // Start progress simulation (runs independently, doesn't block API)
+      const progressPromise = (async () => {
+        for (let i = 0; i < progressSteps.length; i++) {
+          if (progressCancelledRef.current) break;
+          setCurrentStep(i);
+          await new Promise(resolve => setTimeout(resolve, progressSteps[i].duration));
+        }
+        if (!progressCancelledRef.current) {
+          setCurrentStep(progressSteps.length - 1);
+        }
+      })();
+
+      // Make API call - this is what we actually wait for
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -285,11 +327,20 @@ export function CodeAnalyzer() {
         throw new Error(data.details || data.error || "Analysis failed");
       }
 
+      // Cancel progress and show results after minimum delay
+      progressCancelledRef.current = true;
+      setCurrentStep(progressSteps.length - 1);
+      
+      // Artificial 2 second delay to show progress indicator
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
       setResult(data);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
     } finally {
       setIsAnalyzing(false);
+      setCurrentStep(0);
+      progressCancelledRef.current = false;
     }
   };
 
@@ -337,8 +388,68 @@ export function CodeAnalyzer() {
             </button>
           </div>
 
-          {/* Upload Tab */}
-          {activeTab === "upload" && (
+          {/* Scan in Progress - Replaces upload/snippet area */}
+          {isAnalyzing ? (
+            <div className="border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
+              <div className="w-full max-w-xl space-y-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-neutral-900 mb-1">Scan in progress...</h3>
+                  <p className="text-sm text-neutral-600">Analyzing your smart contract for security vulnerabilities</p>
+                </div>
+                
+                <div className="space-y-0">
+                  {progressSteps.map((step, index) => {
+                    const isActive = index === currentStep;
+                    const isCompleted = index < currentStep;
+                    const isPending = index > currentStep;
+                    const isLast = index === progressSteps.length - 1;
+                    
+                    return (
+                      <div key={index} className="flex items-start gap-3">
+                        {/* Progress Indicator */}
+                        <div className="flex flex-col items-center flex-shrink-0">
+                          {isCompleted ? (
+                            <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
+                              <CheckCircle className="h-3.5 w-3.5 text-white" />
+                            </div>
+                          ) : isActive ? (
+                            <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
+                              <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-white"></div>
+                          )}
+                          {/* Simple connecting line */}
+                          {!isLast && (
+                            <div className={`w-0.5 h-6 mt-1.5 ${
+                              isCompleted ? "bg-green-600" : "bg-neutral-200"
+                            }`}></div>
+                          )}
+                        </div>
+                        
+                        {/* Step Content */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium leading-tight ${
+                            isActive ? "text-purple-700" : 
+                            isCompleted ? "text-green-700" : 
+                            "text-neutral-400"
+                          }`}>
+                            {step.title}
+                          </p>
+                          {step.description && isActive && (
+                            <p className="text-xs text-neutral-500 mt-0.5 leading-tight">{step.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Upload Tab */}
+              {activeTab === "upload" && (
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -425,14 +536,14 @@ export function CodeAnalyzer() {
           )}
 
           {/* Error: Upload tab errors - below the upload box */}
-          {error && activeTab === "upload" && (
+          {error && activeTab === "upload" && !isAnalyzing && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700 font-medium">{error}</p>
             </div>
           )}
 
           {/* Snippet Tab */}
-          {activeTab === "snippet" && (
+          {activeTab === "snippet" && !isAnalyzing && (
             <div className="space-y-3">
               {/* Language Selector */}
               <div className="flex items-center gap-2">
@@ -501,12 +612,14 @@ export function CodeAnalyzer() {
               )}
               
               {/* Error: Code validation or other snippet errors */}
-              {error && activeTab === "snippet" && (
+              {error && activeTab === "snippet" && !isAnalyzing && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-sm text-red-700 font-medium">{error}</p>
                 </div>
               )}
             </div>
+          )}
+            </>
           )}
           
           <div className="flex justify-end">
