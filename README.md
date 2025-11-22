@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CryptoSecure - AI-Powered Smart Contract Security Scanner
 
-## Getting Started
+An AI-powered security tool that analyzes TON smart contracts in seconds, identifies vulnerabilities, and provides actionable fixes—making blockchain security accessible to every developer.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Problem Statement
+
+The TON blockchain is experiencing explosive growth with integration into Telegram's 900+ million users, but this rapid expansion has created a critical security crisis:
+
+- **14,995 vulnerabilities** were recently discovered across just 1,640 TON smart contracts (9+ bugs per contract on average)
+- Smart contract bugs have led to **hundreds of millions of dollars stolen** across blockchain ecosystems
+- Professional security audits cost **$10,000-$50,000** and take **2-4 weeks**, making them inaccessible to most developers
+- Existing automated tools only catch syntax errors, missing critical semantic vulnerabilities
+- Most TON developers lack security expertise, yet handle contracts managing real money
+
+**The Result:** Developers launch vulnerable contracts, hackers exploit them, and users lose funds—undermining trust in the entire ecosystem.
+
+---
+
+## Our Solution
+
+**TON Guardian** is an AI-powered security scanner that democratizes smart contract security by:
+
+1. **Instant Analysis** - Scans FunC/Tact smart contracts in under 30 seconds (vs. weeks for manual audits)
+2. **Comprehensive Detection** - Identifies 8+ vulnerability types including reentrancy, access control issues, integer overflow, unchecked returns, and TON-specific defects
+3. **Plain English Explanations** - Translates technical vulnerabilities into understandable language with real-world impact descriptions
+4. **Actionable Fixes** - Provides line-by-line recommendations and secure code alternatives
+5. **Free Access** - Makes professional-grade security analysis available to every developer
+
+**How It Works:**
+```
+Developer uploads contract code → AI analyzes against vulnerability database → 
+Generates security score (0-100) → Highlights critical issues → 
+Suggests specific fixes → Developer implements improvements
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Target Users
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Primary:** TON smart contract developers (DeFi protocols, NFT projects, dApps, DAOs)
+**Secondary:** Project teams conducting pre-deployment checks, auditors for preliminary screening, educational institutions teaching blockchain security
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Key Features (MVP)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. **Smart Contract Upload** - Support for FunC and Tact languages via file upload or code paste
+2. **AI-Powered Analysis Engine** - Leverages Claude AI to detect semantic vulnerabilities beyond basic syntax checking
+3. **Security Score Dashboard** - Visual 0-100 security rating with breakdown by severity (Critical, High, Medium, Low)
+4. **Vulnerability Report** - Detailed findings with:
+   - Issue description in plain language
+   - Affected code lines
+   - Potential exploit scenarios
+   - Remediation steps with code examples
+5. **Sample Vulnerable Contracts** - Pre-loaded test cases for demonstration
+6. **Comparison View** - Before/after code showing secure alternatives
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Technology Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Frontend:**
+- React.js for user interface
+- Recharts for security score visualization
+- Lucide React for icons
+- Tailwind CSS for styling
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Backend/AI:**
+- Anthropic Claude API for code analysis
+- Custom vulnerability database based on TONScanner research
+- TON SDK for contract validation
+
+**Deployment:**
+- Vercel for hosting
+- GitHub for version control
+
+---
+
+## Innovation & Differentiation
+
+**vs. Existing Solutions:**
+
+| Feature | TON Guardian | Manual Audits | Existing Tools |
+|---------|--------------|---------------|----------------|
+| **Speed** | 30 seconds | 2-4 weeks | Minutes |
+| **Cost** | Free | $10K-$50K | Free-$1K |
+| **Explanation Quality** | Plain English with fixes | Technical reports | Error codes only |
+| **Semantic Understanding** | ✅ AI-powered | ✅ Human experts | ❌ Pattern matching only |
+| **Accessibility** | Anyone | Enterprise only | Developers |
+| **Learning Capability** | Adapts to new exploits | Manual updates | Fixed rules |
+
+**Our Unique Value:**
+- First AI-powered TON security tool with natural language explanations
+- Combines speed of automation with depth of semantic analysis
+- Focuses on developer education, not just error flagging
+- Built specifically for TON's unique architecture and vulnerabilities
+
+
+
+## Why This Matters
+
+Smart contract vulnerabilities aren't just technical bugs—they represent real money at risk and eroded trust in blockchain technology. By making security analysis accessible, fast, and educational, TON Guardian empowers developers to build safer applications, protects users from financial loss, and strengthens the entire TON ecosystem.
+
+As TON aims to onboard 500 million users by 2027, security cannot be an afterthought or a luxury only large projects can afford. **Every developer deserves access to world-class security tools.**
+
