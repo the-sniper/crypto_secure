@@ -18,6 +18,7 @@ import {
   Pencil
 } from "lucide-react";
 import { AnalysisResult, Vulnerability } from "@/types/analysis";
+import { AnalysisChat } from "@/components/analysis-chat";
 import { CodeDiffViewer } from "@/components/code-diff-viewer";
 
 // Internal Component for Severity Section (Accordion)
@@ -363,6 +364,9 @@ export function CodeAnalyzer() {
                   <span className="text-xs text-blue-600/80 dark:text-blue-400/80 uppercase font-bold tracking-wider mt-1">Low</span>
                 </div>
               </div>
+
+              {/* Chat Interface */}
+              <AnalysisChat />
 
               {/* 3. Detailed Findings (Accordions) */}
               <div>
