@@ -128,6 +128,54 @@ export function analyzeCodeStatic(rawCode: string): AnalysisResult {
       }
   }
 
+  // 2. Generate Auto-Fix Patch
+  let patchedLines = [...codeLines];
+  // Sort vulnerabilities by line number (descending) to avoid offset issues when inserting lines
+  const sortedVulns = [...vulnerabilities].sort((a, b) => b.line - a.line);
+
+  for (const vuln of sortedVulns) {
+      if (vuln.line <= 0) continue;
+
+      if (vuln.title === "Potential Unprotected Withdrawal" || vuln.title === "Missing Owner Access Control") {
+          // Heuristic: Insert check BEFORE the vulnerable line
+          const insertLineIndex = vuln.line - 1; // 0-based index
+          const indentation = patchedLines[insertLineIndex].match(/^\s*/)?.[0] || "";
+          const fixLine = `${indentation}throw_unless(401, equal_slices(sender_address, owner_address)); ;; Auto-fixed security check`;
+          patchedLines.splice(insertLineIndex, 0, fixLine);
+      } 
+      else if (vuln.title === "Missing Bounced Message Check") {
+          // Heuristic: Insert check at start of function (usually line + 1 for opening brace)
+          // line is likely the function definition line
+          // We try to find the opening brace
+          let insertLineIndex = vuln.line; // Default to next line
+          // Check if brace is on same line
+          if (patchedLines[vuln.line-1].includes("{")) {
+             insertLineIndex = vuln.line;
+          } else {
+              // Maybe brace is on next line? Just default to next for now.
+          }
+          
+          const indentation = "    "; // Default indent
+          const fixLine = `${indentation}if (flags & 1) { return (); } ;; Auto-fixed bounced check`;
+          patchedLines.splice(insertLineIndex, 0, fixLine);
+      }
+      else if (vuln.title === "Unchecked Message Sending") {
+         // Heuristic: Replace mode 0/1/2 with 64
+         // Find the line with send_raw_message
+         const lineIndex = vuln.line - 1;
+         const originalLine = patchedLines[lineIndex];
+         // Replace the mode argument
+         const fixedLine = originalLine.replace(/(send_raw_message\s*\(\s*[^,]+,\s*)(0|1|2)(\s*\))/, "$164$3");
+         
+         // If replacement happened, update line
+         if (fixedLine !== originalLine) {
+             patchedLines[lineIndex] = fixedLine + " ;; Auto-fixed to mode 64";
+         }
+      }
+  }
+
+  const patchedCode = patchedLines.join("\n");
+
   // Calculate Stats
   const stats = {
       total: vulnerabilities.length,
@@ -142,6 +190,7 @@ export function analyzeCodeStatic(rawCode: string): AnalysisResult {
     vulnerabilities,
     summary: `Static analysis completed. Found ${vulnerabilities.length} potential issues.`,
     score: Math.max(0, Math.round(score)),
-    stats
+    stats,
+    patchedCode
   };
 }

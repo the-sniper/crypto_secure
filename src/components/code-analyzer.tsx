@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,9 +13,12 @@ import {
   Info, 
   ChevronDown, 
   ChevronUp, 
-  AlertOctagon 
+  AlertOctagon,
+  Wand2,
+  Pencil
 } from "lucide-react";
 import { AnalysisResult, Vulnerability } from "@/types/analysis";
+import { CodeDiffViewer } from "@/components/code-diff-viewer";
 
 // Internal Component for Severity Section (Accordion)
 const SeveritySection = ({ 
@@ -121,6 +124,36 @@ export function CodeAnalyzer() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  const [showDiff, setShowDiff] = useState(false);
+  const [isEditingFix, setIsEditingFix] = useState(false);
+  const [modifiedFix, setModifiedFix] = useState("");
+
+  // Refs for sync scrolling
+  const diffViewerRef = useRef<{ scrollTo: (top: number) => void }>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
+  const isScrollingRef = useRef<boolean>(false);
+
+  const handleDiffScroll = (e: React.UIEvent<HTMLDivElement>) => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      if (editorRef.current) {
+          editorRef.current.scrollTop = e.currentTarget.scrollTop;
+      }
+      // Reset lock after a short delay to allow other scroll event to fire if needed,
+      // but for 1-way binding usually we want to avoid loop.
+      // Actually, better to use requestAnimationFrame or simple timeout
+      setTimeout(() => { isScrollingRef.current = false; }, 10);
+  };
+
+  const handleEditorScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+      if (isScrollingRef.current) return;
+      isScrollingRef.current = true;
+      if (diffViewerRef.current) {
+          diffViewerRef.current.scrollTo(e.currentTarget.scrollTop);
+      }
+      setTimeout(() => { isScrollingRef.current = false; }, 10);
+  };
 
   const handleAnalyze = async () => {
     if (!code.trim()) return;
@@ -128,6 +161,8 @@ export function CodeAnalyzer() {
     setIsAnalyzing(true);
     setResult(null);
     setError(null);
+    setShowDiff(false);
+    setIsEditingFix(false);
 
     try {
       const response = await fetch("/api/analyze", {
@@ -150,6 +185,21 @@ export function CodeAnalyzer() {
     }
   };
 
+  const handleReviewClick = () => {
+      if (result?.patchedCode) {
+          setModifiedFix(result.patchedCode);
+          setShowDiff(true);
+          setIsEditingFix(false);
+      }
+  };
+
+  const handleAcceptFix = () => {
+      setCode(modifiedFix);
+      setShowDiff(false);
+      setIsEditingFix(false);
+      setResult(null); 
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <Card className="border-2 shadow-lg">
@@ -160,30 +210,113 @@ export function CodeAnalyzer() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Textarea
-            placeholder="// Paste your smart contract code here..."
-            className="min-h-[300px] font-mono text-sm"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
+          {/* Editor Section */}
+          {!showDiff ? (
+             <Textarea
+                placeholder="// Paste your smart contract code here..."
+                className="min-h-[300px] font-mono text-sm"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+             />
+          ) : (
+             <div className="animate-in fade-in slide-in-from-bottom-4">
+                 {isEditingFix ? (
+                     <div className="space-y-4">
+                         <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                             <Info className="h-4 w-4" />
+                             You are editing the proposed fix. The diff view on the left updates in real-time as you type.
+                         </div>
+                         
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 h-[600px]">
+                            <div className="space-y-2 overflow-hidden h-full flex flex-col">
+                                <span className="text-xs font-bold uppercase text-neutral-500 tracking-wider">Live Diff Preview</span>
+                                <div className="flex-1 overflow-hidden">
+                                    <CodeDiffViewer 
+                                        ref={diffViewerRef}
+                                        originalCode={code} 
+                                        patchedCode={modifiedFix} 
+                                        onScroll={handleDiffScroll}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2 h-full flex flex-col">
+                                <span className="text-xs font-bold uppercase text-blue-600 tracking-wider">Proposed Code (Editable)</span>
+                                <div className="rounded-md border bg-neutral-950 font-mono text-sm overflow-hidden shadow-2xl h-full flex flex-col">
+                                    <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-neutral-900 border-b border-neutral-800">
+                                        <span className="text-xs font-bold text-neutral-400 tracking-wider">EDITOR</span>
+                                        <div className="text-xs text-neutral-500">Editable</div>
+                                    </div>
+                                    <textarea
+                                        ref={editorRef}
+                                        className="flex-1 w-full bg-transparent text-neutral-300 p-4 resize-none focus:outline-none font-mono text-sm leading-relaxed"
+                                        value={modifiedFix}
+                                        onChange={(e) => setModifiedFix(e.target.value)}
+                                        onScroll={handleEditorScroll}
+                                        spellCheck={false}
+                                    />
+                                </div>
+                            </div>
+                         </div>
+
+                         <div className="flex justify-end gap-3 pt-4">
+                             <Button variant="outline" onClick={() => setIsEditingFix(false)}>
+                                 Cancel Edit
+                             </Button>
+                             <Button onClick={() => setIsEditingFix(false)} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                 Preview Final Diff
+                             </Button>
+                         </div>
+                     </div>
+                 ) : (
+                     <>
+                        <CodeDiffViewer originalCode={code} patchedCode={modifiedFix} />
+                        <div className="flex justify-between items-center mt-4">
+                            <Button variant="outline" onClick={() => setIsEditingFix(true)} className="border-neutral-300">
+                                <Pencil className="mr-2 h-4 w-4" /> Edit Proposed Code
+                            </Button>
+                            <div className="flex gap-3">
+                                <Button variant="ghost" onClick={() => setShowDiff(false)}>
+                                    Deny / Cancel
+                                </Button>
+                                <Button onClick={handleAcceptFix} className="bg-green-600 hover:bg-green-700 text-white">
+                                    <CheckCircle className="mr-2 h-4 w-4" /> Accept Fixes
+                                </Button>
+                            </div>
+                        </div>
+                     </>
+                 )}
+             </div>
+          )}
           
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleAnalyze} 
-              disabled={isAnalyzing || !code.trim()}
-              size="lg"
-              className="w-full sm:w-auto"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Analyzing Logic...
-                </>
-              ) : (
-                "Scan for Bugs"
-              )}
-            </Button>
-          </div>
+          {!showDiff && (
+            <div className="flex justify-end gap-3">
+                {result && result.patchedCode && result.vulnerabilities.length > 0 && (
+                    <Button 
+                        variant="outline"
+                        onClick={handleReviewClick}
+                        className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
+                    >
+                        <Wand2 className="mr-2 h-4 w-4" />
+                        Review Auto-Fixes
+                    </Button>
+                )}
+                <Button 
+                onClick={handleAnalyze} 
+                disabled={isAnalyzing || !code.trim()}
+                size="lg"
+                className="w-full sm:w-auto"
+                >
+                {isAnalyzing ? (
+                    <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing Logic...
+                    </>
+                ) : (
+                    "Scan for Bugs"
+                )}
+                </Button>
+            </div>
+          )}
 
           {error && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-800">
@@ -192,7 +325,7 @@ export function CodeAnalyzer() {
             </div>
           )}
 
-          {result && (
+          {result && !showDiff && (
             <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
               
               {/* 1. Executive Summary & Score */}

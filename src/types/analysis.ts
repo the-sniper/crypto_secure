@@ -7,8 +7,8 @@ export interface Vulnerability {
   title: string;
   description: string;
   suggestion: string;
-  scenario?: string; // Exploit scenario description
-  affectedCode?: string; // The actual code snippet causing the issue
+  scenario?: string; 
+  affectedCode?: string; 
   fileName?: string; 
   function?: string; 
 }
@@ -25,4 +25,5 @@ export interface AnalysisResult {
     low: number;
     info: number;
   };
+  patchedCode?: string; // The auto-fixed code
 }
