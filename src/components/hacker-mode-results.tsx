@@ -1,17 +1,14 @@
 "use client";
 
 import { HackerModeResult, ExploitAttempt, AttackSurface } from "@/types/analysis";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
-  AlertTriangle, 
   Shield, 
   Bug,
-  AlertOctagon,
-  Info,
   ChevronDown,
   ChevronUp,
-  Code,
   Target,
+  ShieldAlert,
+  Award
 } from "lucide-react";
 import { useState } from "react";
 
@@ -47,19 +44,29 @@ export function HackerModeResults({ result }: HackerModeResultsProps) {
   const theoreticalExploits = result.exploits.filter(e => e.status === "theoretical");
   const notApplicableExploits = result.exploits.filter(e => e.status === "not-applicable");
 
+  // Mapping Risk Level to Grade-like visual styles
   const getRiskLevelStyles = (risk: string) => {
     switch (risk) {
       case "Critical":
-        return "bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-900/10 border-red-200 dark:border-red-800";
+        return "bg-gradient-to-br from-red-600 to-red-800 border-red-500 text-white";
       case "High":
-        return "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-900/10 border-orange-200 dark:border-orange-800";
+        return "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white";
       case "Medium":
-        return "bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-900/10 border-yellow-200 dark:border-yellow-800";
+        return "bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 text-white";
       case "Low":
-        return "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 border-green-200 dark:border-green-800";
+        return "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white";
       default:
-        return "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-900/10 border-green-200 dark:border-green-800";
+        return "bg-gradient-to-br from-blue-500 to-blue-600 border-blue-400 text-white";
     }
+  };
+  
+  // Mapping Resilience Score to color
+  const getScoreStyles = (score: number) => {
+      if (score >= 90) return "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white";
+      if (score >= 75) return "bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 text-white";
+      if (score >= 60) return "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white";
+      if (score >= 40) return "bg-gradient-to-br from-red-500 to-rose-600 border-red-400 text-white";
+      return "bg-gradient-to-br from-red-600 to-red-800 border-red-500 text-white";
   };
 
   // Severity colors matching Standard Audit
@@ -87,41 +94,69 @@ export function HackerModeResults({ result }: HackerModeResultsProps) {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-top-4">
-      {/* Hacker Resilience Score */}
-      <div className="grid gap-6 md:grid-cols-[1fr_200px]">
-        <div className={`p-5 rounded-xl border shadow-sm ${getRiskLevelStyles(result.riskLevel)}`}>
-          <h3 className="font-bold text-lg mb-2 flex items-center gap-2">
-            <Shield className="h-5 w-5 text-blue-600" />
-            Hacker Mode Analysis
-          </h3>
-          <p className="text-neutral-700 dark:text-neutral-300">{result.summary}</p>
-        </div>
-        <div className={`relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:scale-105 ${
-          result.riskLevel === "Critical" ? "bg-gradient-to-br from-red-600 to-red-800 border-red-500 text-white" :
-          result.riskLevel === "High" ? "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white" :
-          result.riskLevel === "Medium" ? "bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 text-white" :
-          "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white"
-        } flex flex-col items-center justify-center p-5`}>
-          {/* Decorative pattern */}
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
-          
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="mb-2 p-2 rounded-full bg-white/20 backdrop-blur-sm">
-              <Shield className="h-6 w-6 text-white" />
+    <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
+      {/* Executive Summary, Score & Risk Level */}
+      <div className="relative">
+         {/* Background gradient overlay */}
+         <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50 dark:from-purple-950/20 dark:via-indigo-950/20 dark:to-blue-900/20 rounded-2xl -z-10"></div>
+
+         <div className="grid gap-6 lg:grid-cols-12 p-6">
+          {/* Summary */}
+          <div className="lg:col-span-7 flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-700 text-white shadow-lg">
+                <ShieldAlert className="h-5 w-5" />
+              </div>
+              <h3 className="font-bold text-xl text-neutral-900 dark:text-neutral-100">Hacker Assessment</h3>
             </div>
-            <div className="text-5xl font-black tracking-tight mb-1 drop-shadow-lg text-white">
-              {result.hackerResilienceScore}
-            </div>
-            <div className="text-xs font-semibold uppercase tracking-widest opacity-90 text-white">
-              Resilience Score
-            </div>
-            <div className="mt-3 text-xs opacity-75 text-white">
-              out of 100
+            <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm rounded-xl p-5 border border-neutral-200/50 dark:border-neutral-800/50 shadow-sm flex-1">
+              <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed text-sm">
+                {result.summary}
+              </p>
             </div>
           </div>
-        </div>
+
+           {/* Score & Risk Cards */}
+           <div className="lg:col-span-5 grid grid-cols-2 gap-4 h-full">
+             {/* Resilience Score Card */}
+             <div className={`relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:scale-105 h-full ${getScoreStyles(result.hackerResilienceScore)}`}>
+               {/* Decorative pattern */}
+               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+               
+               <div className="relative p-6 flex flex-col items-center justify-center h-full">
+                 <div className="mb-2 p-2 rounded-full bg-white/20 backdrop-blur-sm">
+                   <Shield className="h-6 w-6" />
+                 </div>
+                 <div className="text-6xl font-black tracking-tight mb-1 drop-shadow-lg">
+                   {result.hackerResilienceScore}
+                 </div>
+                 <div className="text-xs font-semibold uppercase tracking-widest opacity-90 text-center">
+                   Resilience Score
+                 </div>
+               </div>
+             </div>
+
+             {/* Risk Level Card (Grade Equivalent) */}
+             <div className={`relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:scale-105 h-full ${getRiskLevelStyles(result.riskLevel)}`}>
+               {/* Decorative pattern */}
+               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+               <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+               
+               <div className="relative p-6 flex flex-col items-center justify-center h-full">
+                 <div className="mb-2 p-2 rounded-full bg-white/20 backdrop-blur-sm">
+                   <Award className="h-6 w-6" />
+                 </div>
+                 <div className="text-3xl font-black tracking-tight mb-1 drop-shadow-lg text-center">
+                   {result.riskLevel}
+                 </div>
+                 <div className="text-xs font-semibold uppercase tracking-widest opacity-90 text-center">
+                   Risk Level
+                 </div>
+               </div>
+             </div>
+           </div>
+         </div>
       </div>
 
       {/* Attack Surface Map */}

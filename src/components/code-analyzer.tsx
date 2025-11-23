@@ -31,6 +31,7 @@ import { CodeDiffViewer } from "@/components/code-diff-viewer";
 import { HackerModeResults } from "@/components/hacker-mode-results";
 import { pdf } from "@react-pdf/renderer";
 import { PdfReport } from "@/components/pdf-report";
+import { HackerPdfReport } from "@/components/hacker-pdf-report";
 import { SimpleTooltip } from "@/components/ui/simple-tooltip";
 
 // Helper to map severity to display name
@@ -368,6 +369,8 @@ export function CodeAnalyzer() {
   const [isHacking, setIsHacking] = useState(false);
   const [hackerResult, setHackerResult] = useState<HackerModeResult | null>(null);
   const [hackerStep, setHackerStep] = useState(0);
+  const [isGeneratingHackerPdf, setIsGeneratingHackerPdf] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressCancelledRef = useRef(false);
 
@@ -864,6 +867,7 @@ export function CodeAnalyzer() {
 
   const handleDownloadReport = async () => {
     if (!result) return;
+    setIsGeneratingPdf(true);
     
     try {
       const blob = await pdf(<PdfReport result={result} />).toBlob();
@@ -878,6 +882,30 @@ export function CodeAnalyzer() {
     } catch (err) {
       console.error("Failed to generate PDF:", err);
       setError("Failed to generate PDF report. Please try again.");
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleHackerDownloadReport = async () => {
+    if (!hackerResult) return;
+    setIsGeneratingHackerPdf(true);
+    
+    try {
+      const blob = await pdf(<HackerPdfReport result={hackerResult} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `hacker-mode-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to generate Hacker PDF:", err);
+      setError("Failed to generate Hacker Mode report. Please try again.");
+    } finally {
+        setIsGeneratingHackerPdf(false);
     }
   };
 
@@ -1217,14 +1245,36 @@ export function CodeAnalyzer() {
           )}
           
           {!showDiff && (
-            <div className="flex justify-end gap-3">
+            <div className="flex justify-end gap-3 flex-wrap">
                 {result && (
                   <Button
                     variant="outline"
                     onClick={handleDownloadReport}
-                    className="border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+                    disabled={isGeneratingPdf}
+                    size="lg"
+                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    {isGeneratingPdf ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
+                    Download Report
+                  </Button>
+                )}
+                {hackerResult && (
+                  <Button
+                    variant="outline"
+                    onClick={handleHackerDownloadReport}
+                    disabled={isGeneratingHackerPdf}
+                    size="lg"
+                    className="border-purple-300 text-purple-700 hover:bg-purple-50"
+                  >
+                    {isGeneratingHackerPdf ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="mr-2 h-4 w-4" />
+                    )}
                     Download Report
                   </Button>
                 )}
@@ -1232,6 +1282,7 @@ export function CodeAnalyzer() {
                     <Button 
                         variant="outline"
                         onClick={handleReviewClick}
+                        size="lg"
                         className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
                     >
                         <Wand2 className="mr-2 h-4 w-4" />
@@ -1293,7 +1344,7 @@ export function CodeAnalyzer() {
             }>
             <Button 
               onClick={handleAnalyze} 
-                disabled={isAnalyzing || isHacking || !canScan()}
+              disabled={isAnalyzing || isHacking || !canScan()}
               size="lg"
               className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
             >
@@ -1442,13 +1493,13 @@ export function CodeAnalyzer() {
 
               {/* Hacker Mode Section - Moved to be more prominent */}
               {!isHacking && !hackerResult && (
-                <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl">
+                <div className="p-6 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl">
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div className="flex-1">
-                      <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
-                        🧠 Hacker Mode (Premium Audit)
+                      <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                        <ShieldAlert className="h-5 w-5 text-purple-600 dark:text-purple-400" /> Hacker Mode (Premium Audit)
                       </h3>
-                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                      <p className="text-sm text-purple-700 dark:text-purple-300">
                         Activate our AI-powered adversarial analysis to discover novel attack vectors that static analysis might miss. 
                       </p>
                     </div>
@@ -1456,9 +1507,9 @@ export function CodeAnalyzer() {
                       onClick={handleHackerMode}
                       disabled={isAnalyzing}
                       size="lg"
-                      className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                      className="bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap"
                     >
-                      🧠 Activate Hacker Mode
+                      <ShieldAlert className="mr-2 h-4 w-4" /> Activate Hacker Mode
                     </Button>
                   </div>
                 </div>
