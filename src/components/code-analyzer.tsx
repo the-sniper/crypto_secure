@@ -642,12 +642,21 @@ export function CodeAnalyzer() {
   const applyAllFixes = (originalCode: string, findings: Finding[]): string => {
     const codeLines = originalCode.split('\n');
     const findingsWithChanges = findings
-      .filter(f => f.codeChanges && f.codeChanges.vulnerableCode && f.codeChanges.fixedCode)
+      .filter(f => f.codeChanges && f.codeChanges.vulnerableCode)
       .map(finding => {
         if (!finding.codeChanges) return null;
         
+        // Use code from codeChanges (complete code fields are now at root level)
+        const vulnerableCodeToMatch = finding.codeChanges.vulnerableCode;
+        const fixedCodeToUse = finding.codeChanges.fixedCode;
+        
+        if (!vulnerableCodeToMatch || !fixedCodeToUse) {
+          console.warn(`Finding ${finding.id}: Missing required code fields. Skipping.`);
+          return null;
+        }
+        
         // Try to find the code position by content matching
-        const position = findCodePosition(originalCode, finding.codeChanges.vulnerableCode);
+        const position = findCodePosition(originalCode, vulnerableCodeToMatch);
         
         // Fallback to line numbers if content matching fails
         let startIdx: number;
@@ -664,7 +673,7 @@ export function CodeAnalyzer() {
           // Validate that the code at these lines roughly matches
           const codeAtLines = codeLines.slice(startIdx, endIdx + 1).join('\n');
           const normalizedCodeAtLines = normalizeCode(codeAtLines);
-          const normalizedVulnerable = normalizeCode(finding.codeChanges.vulnerableCode);
+          const normalizedVulnerable = normalizeCode(vulnerableCodeToMatch);
           
           // If the code doesn't match at all, skip this finding
           if (!normalizedCodeAtLines.includes(normalizedVulnerable) && 
@@ -681,7 +690,7 @@ export function CodeAnalyzer() {
           finding,
           startIdx,
           endIdx,
-          fixedCode: finding.codeChanges.fixedCode
+          fixedCode: fixedCodeToUse
         };
       })
       .filter((item): item is { finding: Finding; startIdx: number; endIdx: number; fixedCode: string } => item !== null)
@@ -705,12 +714,25 @@ export function CodeAnalyzer() {
   };
 
   const handleReviewClick = () => {
-      if (!result || !result.findings.some(f => f.codeChanges)) {
+      if (!result) {
           return;
       }
       
       const originalCode = getCurrentCode();
-      const completeModifiedCode = applyAllFixes(originalCode, result.findings);
+      
+      // Prefer root-level complete code fields if available (more accurate)
+      let completeModifiedCode: string;
+      
+      if (result.proposedCodeComplete) {
+          // Use the complete fixed code from root level (most accurate)
+          completeModifiedCode = result.proposedCodeComplete;
+      } else if (result.findings.some(f => f.codeChanges)) {
+          // Fallback to applying fixes from individual findings
+          completeModifiedCode = applyAllFixes(originalCode, result.findings);
+      } else {
+          // No fixes available
+          return;
+      }
       
       setModifiedFix(completeModifiedCode);
       setShowDiff(true);
@@ -721,6 +743,44 @@ export function CodeAnalyzer() {
       if (activeTab === "upload") {
           setActiveTab("snippet");
       }
+      
+      // Auto-detect and set language
+      // First, try to use language from analysis metadata if available
+      let selectedLang: LanguageType | "" = "";
+      if (result?.analysisMetadata?.language) {
+          const metaLang = result.analysisMetadata.language.toLowerCase();
+          const languageMap: Record<string, LanguageType> = {
+              'func': 'func',
+              'tact': 'tact',
+              'fc': 'fc'
+          };
+          const mappedLang = languageMap[metaLang];
+          if (mappedLang && isValidLanguage(mappedLang)) {
+              selectedLang = mappedLang;
+          }
+      }
+      
+      // Fallback to code detection if metadata language not available or invalid
+      if (!selectedLang) {
+          const detectedLang = detectCodeLanguage(modifiedFix);
+          if (detectedLang) {
+              const languageMap: Record<string, LanguageType> = {
+                  'tact': 'tact',
+                  'func': 'func',
+                  'fc': 'fc'
+              };
+              const mappedLang = languageMap[detectedLang];
+              if (mappedLang && isValidLanguage(mappedLang)) {
+                  selectedLang = mappedLang;
+              }
+          }
+      }
+      
+      // Set the language if we found one
+      if (selectedLang) {
+          setSnippetLanguage(selectedLang);
+      }
+      
       setSnippetCode(modifiedFix);
       setShowDiff(false);
       setIsEditingFix(false);

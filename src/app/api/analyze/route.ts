@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { AnalysisResult } from "@/types/analysis";
 import crypto from "crypto";
 import { SYSTEM_PROMPT, createAnalysisPrompt } from "@/lib/analyzer/prompts";
+import { createAIProvider, getProviderConfig } from "@/lib/analyzer/ai-providers";
 
 // Simple in-memory cache for demo purposes
 const analysisCache = new Map<string, any>();
@@ -61,56 +61,55 @@ export async function POST(req: Request) {
     // Extract contract name
     const finalContractName = contractName || extractContractName(filename);
 
-    // Check for API key
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    // Get AI provider configuration
+    const providerConfig = getProviderConfig();
+    if (!providerConfig) {
       return NextResponse.json(
         { 
-          error: "OpenAI API key not configured",
-          details: "Please set OPENAI_API_KEY environment variable"
+          error: "AI provider not configured",
+          details: "Please set your API Key in the environment variable"
         },
         { status: 500 }
       );
     }
 
+    // Log provider and model selection
+    console.log(`[AI Provider] Using ${providerConfig.provider.toUpperCase()} with model: ${providerConfig.model || 'default'}`);
+    console.log(`[Analysis] Contract: ${finalContractName}, Lines: ${code.split('\n').length}`);
+
     // Prompts
     const systemPrompt = SYSTEM_PROMPT;
     const analysisPrompt = createAnalysisPrompt(code, finalContractName);
 
-    // Call OpenAI
+    // Call AI provider
     let aiResponse: AnalysisResult;
+    const startTime = Date.now();
     try {
-      const openai = new OpenAI({ apiKey });
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: analysisPrompt }
-        ],
-        temperature: 0.3, // Lower temperature for more consistent analysis
-        response_format: { type: "json_object" }, // Request JSON format
-      });
-
-      const responseText = completion.choices[0].message.content;
-      if (!responseText) {
-        throw new Error("Empty response from AI");
-      }
+      console.log(`[AI Request] Sending request to ${providerConfig.provider.toUpperCase()}...`);
+      const provider = createAIProvider(providerConfig);
+      const response = await provider.generateResponse(systemPrompt, analysisPrompt);
+      const duration = Date.now() - startTime;
+      console.log(`[AI Response] Received response from ${providerConfig.provider.toUpperCase()} in ${duration}ms`);
 
       // Parse the response
-      aiResponse = parseAIResponse(responseText);
+      aiResponse = parseAIResponse(response.content);
       
       // Add analysis date if not present
       if (!aiResponse.analysisMetadata.analysisDate) {
         aiResponse.analysisMetadata.analysisDate = new Date().toISOString();
       }
 
+      // Log analysis results
+      console.log(`[Analysis Complete] Score: ${aiResponse.securityScore}, Grade: ${aiResponse.grade}, Findings: ${aiResponse.findings.length} (${aiResponse.findingsSummary.critical} critical, ${aiResponse.findingsSummary.high} high)`);
+
     } catch (error: any) {
-      console.error("AI analysis failed:", error);
+      const duration = Date.now() - startTime;
+      console.error(`[AI Error] ${providerConfig.provider.toUpperCase()} request failed after ${duration}ms:`, error.message || error);
       return NextResponse.json(
         { 
-          error: "Failed to analyze code with AI.", 
+          error: `Failed to analyze code with ${providerConfig.provider.toUpperCase()}.`, 
           details: error.message || "Unknown error",
-          hint: "Please check your OpenAI API key and try again."
+          hint: `Please check your ${providerConfig.provider.toUpperCase()} API key and try again.`
         },
         { status: 500 }
       );
@@ -118,6 +117,7 @@ export async function POST(req: Request) {
 
     // Cache the result
     analysisCache.set(codeHash, aiResponse);
+    console.log(`[Cache] Stored analysis result for hash: ${codeHash.substring(0, 8)}...`);
 
     return NextResponse.json(aiResponse);
 
