@@ -21,8 +21,9 @@ import {
   X,
   FileText
 } from "lucide-react";
-import { AnalysisResult, Vulnerability } from "@/types/analysis";
+import { AnalysisResult, Vulnerability, HackerModeResult } from "@/types/analysis";
 import { CodeDiffViewer } from "@/components/code-diff-viewer";
+import { HackerModeResults } from "@/components/hacker-mode-results";
 
 // Internal Component for Severity Section (Accordion)
 const SeveritySection = ({ 
@@ -282,6 +283,9 @@ export function CodeAnalyzer() {
   const [snippetCode, setSnippetCode] = useState<string>("");
   const [snippetLanguage, setSnippetLanguage] = useState<LanguageType | "">("");
   const [codeValidationError, setCodeValidationError] = useState<string | null>(null);
+  const [isHacking, setIsHacking] = useState(false);
+  const [hackerResult, setHackerResult] = useState<HackerModeResult | null>(null);
+  const [hackerStep, setHackerStep] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progressCancelledRef = useRef(false);
 
@@ -478,7 +482,7 @@ export function CodeAnalyzer() {
       setCurrentStep(progressSteps.length - 1);
       
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       setResult(data);
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred");
@@ -505,6 +509,71 @@ export function CodeAnalyzer() {
       setShowDiff(false);
       setIsEditingFix(false);
       setResult(null); 
+  };
+
+  const hackerProgressSteps = [
+    { title: "Enumerating attack surfaces...", duration: 1500 },
+    { title: "Generating exploit strategies...", duration: 2000 },
+    { title: "Validating attack feasibility...", duration: 1500 },
+    { title: "Preparing defensive recommendations...", duration: 1000 }
+  ];
+
+  const handleHackerMode = async () => {
+    const currentCode = getCurrentCode();
+    if (!currentCode.trim() || !result) {
+      return;
+    }
+
+    setIsHacking(true);
+    setHackerResult(null);
+    setHackerStep(0);
+
+    try {
+      const language = activeTab === "snippet" && snippetLanguage 
+        ? snippetLanguage 
+        : uploadedFile?.name.split('.').pop()?.toLowerCase() || "func";
+
+      // Progress simulation
+      const progressPromise = (async () => {
+        for (let i = 0; i < hackerProgressSteps.length; i++) {
+          setHackerStep(i);
+          await new Promise(resolve => setTimeout(resolve, hackerProgressSteps[i].duration));
+        }
+        setHackerStep(hackerProgressSteps.length - 1);
+      })();
+
+      const response = await fetch("/api/hack", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          code: currentCode,
+          language: language,
+          originalVulnerabilities: result.vulnerabilities
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const errorMsg = data.details || data.error || "Hacker Mode analysis failed";
+        // Provide more helpful error message for missing API key
+        if (errorMsg.includes("AI service not configured") || errorMsg.includes("OPENAI_API_KEY")) {
+          throw new Error("OpenAI API key not configured. Please set OPENAI_API_KEY in your .env.local file. See .env.example for reference.");
+        }
+        throw new Error(errorMsg);
+      }
+
+      // Wait for progress to complete
+      await progressPromise;
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      setHackerResult(data);
+    } catch (err: any) {
+      setError(err.message || "Hacker Mode analysis failed");
+    } finally {
+      setIsHacking(false);
+      setHackerStep(0);
+    }
   };
 
   return (
@@ -724,8 +793,8 @@ export function CodeAnalyzer() {
                         </div>
                       </div>
                       
-                      <Textarea
-                        placeholder="// Paste your smart contract code here..."
+          <Textarea
+            placeholder="// Paste your smart contract code here..."
                         className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-purple-500 focus-visible:ring-purple-500/20 focus-visible:ring-[2px]"
                         value={snippetCode}
                         onChange={(e) => {
@@ -848,22 +917,22 @@ export function CodeAnalyzer() {
                         Review Auto-Fixes
                     </Button>
                 )}
-                <Button 
-                onClick={handleAnalyze} 
+            <Button 
+              onClick={handleAnalyze} 
                 disabled={isAnalyzing || !canScan()}
-                size="lg"
-                className="w-full sm:w-auto"
-                >
-                {isAnalyzing ? (
-                    <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing Logic...
-                    </>
-                ) : (
-                    "Scan for Bugs"
-                )}
-                </Button>
-            </div>
+              size="lg"
+              className="w-full sm:w-auto"
+            >
+              {isAnalyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing Logic...
+                </>
+              ) : (
+                "Scan for Bugs"
+              )}
+            </Button>
+          </div>
           )}
 
           {error && !activeTab && (
@@ -915,11 +984,11 @@ export function CodeAnalyzer() {
               {/* 3. Detailed Findings (Accordions) */}
               <div>
                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
-                   <Bug className="h-5 w-5" />
+                  <Bug className="h-5 w-5" />
                    Vulnerability Report
-                 </h3>
-
-                 {result.vulnerabilities.length === 0 ? (
+                </h3>
+                
+                {result.vulnerabilities.length === 0 ? (
                     <div className="p-8 text-center border-2 border-dashed border-green-200 rounded-xl bg-green-50/50">
                         <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
                         <h4 className="font-bold text-green-800 text-lg">All Clear!</h4>
@@ -967,6 +1036,90 @@ export function CodeAnalyzer() {
                  )}
               </div>
 
+            </div>
+          )}
+
+          {/* Hacker Mode Section */}
+          {result && !showDiff && !isHacking && !hackerResult && (
+            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    🧠 Hacker Mode (AI Red Team)
+                  </h3>
+                  <p className="text-sm text-purple-700 dark:text-purple-300">
+                    Activate our AI-powered adversarial analysis to discover novel attack vectors that static analysis might miss. 
+                    Our hacker agent will attempt to exploit your contract using creative strategies.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleHackerMode}
+                  disabled={isAnalyzing || !result}
+                  size="lg"
+                  className="bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap"
+                >
+                  🧠 Activate Hacker Mode
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Hacker Mode Progress */}
+          {isHacking && (
+            <div className="mt-8 border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
+              <div className="w-full max-w-xl space-y-6">
+                <div>
+                  <h3 className="text-xl font-semibold text-neutral-900 mb-2">Hacker Mode Analysis...</h3>
+                  <p className="text-sm text-neutral-600">AI agent is attempting to exploit your contract</p>
+                </div>
+                <div className="space-y-1">
+                  {hackerProgressSteps.map((step, index) => {
+                    const isActive = index === hackerStep;
+                    const isCompleted = index < hackerStep;
+                    const isPending = index > hackerStep;
+                    const isLast = index === hackerProgressSteps.length - 1;
+
+                    return (
+                      <div key={index} className="flex items-start gap-4">
+                        <div className="flex flex-col items-center flex-shrink-0">
+                          {isCompleted ? (
+                            <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center shadow-sm">
+                              <CheckCircle className="h-3 w-3 text-white" />
+                            </div>
+                          ) : isActive ? (
+                            <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
+                              <Loader2 className="h-3 w-3 text-white animate-spin" />
+                  </div>
+                ) : (
+                            <div className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-white shadow-sm"></div>
+                          )}
+                          {!isLast && (
+                            <div className={`w-0.5 h-6 mt-1 ${
+                              isCompleted ? "bg-green-600" : "bg-neutral-200"
+                            }`}></div>
+                          )}
+                        </div>
+                        <div className="flex-1 pb-2">
+                          <p className={`text-sm font-medium leading-tight ${
+                            isActive ? "text-purple-700" :
+                            isCompleted ? "text-green-700" :
+                            "text-neutral-400"
+                          }`}>
+                            {step.title}
+                          </p>
+                      </div>
+                      </div>
+                    );
+                  })}
+                    </div>
+              </div>
+            </div>
+          )}
+
+          {/* Hacker Mode Results */}
+          {hackerResult && !isHacking && (
+            <div className="mt-8">
+              <HackerModeResults result={hackerResult} />
             </div>
           )}
         </CardContent>
