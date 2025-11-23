@@ -23,10 +23,13 @@ import {
   ArrowRight,
   Shield,
   Award,
-  FileCheck
+  FileCheck,
+  Download
 } from "lucide-react";
 import { AnalysisResult, Finding } from "@/types/analysis";
 import { CodeDiffViewer } from "@/components/code-diff-viewer";
+import { pdf } from "@react-pdf/renderer";
+import { PdfReport } from "@/components/pdf-report";
 
 // Helper to map severity to display name
 const getSeverityDisplayName = (severity: string): string => {
@@ -727,6 +730,25 @@ export function CodeAnalyzer() {
       setResult(null); 
   };
 
+  const handleDownloadReport = async () => {
+    if (!result) return;
+    
+    try {
+      const blob = await pdf(<PdfReport result={result} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `security-report-${new Date().toISOString().split('T')[0]}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to generate PDF:", err);
+      setError("Failed to generate PDF report. Please try again.");
+    }
+  };
+
   return (
     <div className="w-full max-w-5xl mx-auto">
       <Card className="border-2 shadow-lg">
@@ -1065,6 +1087,16 @@ export function CodeAnalyzer() {
           
           {!showDiff && (
             <div className="flex justify-end gap-3">
+                {result && (
+                  <Button
+                    variant="outline"
+                    onClick={handleDownloadReport}
+                    className="border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Report
+                  </Button>
+                )}
                 {result && result.findings.some(f => f.codeChanges) && (
                     <Button 
                         variant="outline"
