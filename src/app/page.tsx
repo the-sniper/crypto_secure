@@ -38,27 +38,27 @@ const MissionControl = () => {
   const [code, setCode] = useState("");
   const [showFix, setShowFix] = useState(false);
   
-  const vulnerableCode = `function recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) {
+  const vulnerableCode = `() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     if (in_msg_body.slice_empty?()) { return (); }
     
-    // Vulnerable: No access control
+    ;; Vulnerable: No access control
     int op = in_msg_body~load_uint(32);
     
     if (op == 1) {
-      // Withdraw all funds
+      ;; Withdraw all funds
       send_raw_message(msg, 128);
     }
 }`;
 
-  const fixedCode = `function recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) {
+  const fixedCode = `() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
     if (in_msg_body.slice_empty?()) { return (); }
     
-    // Fixed: Access control added
+    ;; Fixed: Access control added
     throw_unless(401, equal_slices(sender_address, owner_address));
     int op = in_msg_body~load_uint(32);
     
     if (op == 1) {
-      // Withdraw all funds
+      ;; Withdraw all funds
       send_raw_message(msg, 128);
     }
 }`;
@@ -92,9 +92,9 @@ const MissionControl = () => {
             <div className="flex-1 bg-[#0d1117]/50 p-5 font-mono text-xs text-neutral-400 border-r border-white/5 overflow-hidden relative">
                 <div className="absolute left-0 top-10 w-full h-8 bg-gradient-to-r from-red-500/20 to-transparent border-l-2 border-red-500 transition-opacity duration-300" style={{ opacity: score < 50 ? 1 : 0 }}></div>
                 <div className="space-y-2 leading-relaxed">
-                    <div className="text-neutral-600 italic">// Analyzing Smart Contract...</div>
-                    <div><span className="text-purple-400">function</span> <span className="text-blue-400">run_tick</span>() &#123;</div>
-                    <div className="pl-4 text-neutral-300">int balance = <span className="text-yellow-300">get_balance</span>();</div>
+                    <div className="text-neutral-600 italic">;; Analyzing Smart Contract...</div>
+                    <div><span className="text-purple-400">()</span> <span className="text-blue-400">recv_internal</span>(...) <span className="text-purple-400">impure</span> &#123;</div>
+                    <div className="pl-4 text-neutral-300">int op = in_msg_body~<span className="text-yellow-300">load_uint</span>(32);</div>
                     <div className="pl-4 text-purple-300">if (op == 1) &#123;</div>
                     <div className="pl-8 text-white bg-white/5 rounded px-1">send_raw_message(msg, 128);</div>
                     <div className="pl-4">&#125;</div>
@@ -365,7 +365,7 @@ export default function Home() {
                     <div className="space-y-1">
                         <div className="flex text-neutral-400">
                             <span className="w-8 opacity-50">12</span>
-                            <span>function recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) &#123;</span>
+                            <span>() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure &#123;</span>
                         </div>
                         <div className="flex text-neutral-400">
                             <span className="w-8 opacity-50">13</span>
