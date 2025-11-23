@@ -771,7 +771,7 @@ export function CodeAnalyzer() {
         body: JSON.stringify({ 
           code: currentCode,
           language: language,
-          originalVulnerabilities: result.vulnerabilities
+          originalVulnerabilities: result.findings
         }),
       });
 

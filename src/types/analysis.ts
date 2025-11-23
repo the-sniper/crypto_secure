@@ -118,55 +118,7 @@ export interface ExploitAttempt {
   exploitCode?: string;
   vulnerableLines?: number[];
   tonSpecificNotes?: string;
-  severity: Severity;
-}
-
-export interface DefenseRecommendation {
-  exploitId: string;
-  mitigation: string;
-  codeExample?: string;
-  tonSpecific?: boolean;
-}
-
-export interface HackerModeResult {
-  hackerResilienceScore: number;
-  attackSurface: AttackSurface[];
-  exploits: ExploitAttempt[];
-  summary: string;
-  score: number;
-  stats: {
-    total: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
-  patchedCode?: string;
-}
-
-export interface AttackSurface {
-  id: string;
-  entryPoint: string; 
-  riskFactors: string[];
-  notes: string;
-  lineNumber?: number;
-}
-
-export interface ExploitAttempt {
-  id: string;
-  attackSurfaceId: string;
-  title: string;
-  type: "reentrancy" | "access-control" | "economic" | "dos" | "integer-overflow" | "other";
-  prerequisites: string;
-  steps: string[];
-  expectedImpact: string;
-  likelihood: "low" | "medium" | "high";
-  status: "plausible" | "theoretical" | "not-applicable";
-  exploitCode?: string;
-  vulnerableLines?: number[];
-  tonSpecificNotes?: string;
-  severity: Severity;
+  severity: LegacySeverity;
 }
 
 export interface DefenseRecommendation {

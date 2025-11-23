@@ -300,6 +300,7 @@ export function HackerModeResults({ result }: HackerModeResultsProps) {
             {/* Theoretical Exploits */}
             {theoreticalExploits.map((exploit) => {
               const isExpanded = expandedExploits.has(exploit.id);
+              const recommendation = result.recommendations.find(r => r.exploitId === exploit.id);
               
               return (
                 <div
@@ -340,6 +341,26 @@ export function HackerModeResults({ result }: HackerModeResultsProps) {
                         <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 mb-2">Expected Impact:</p>
                         <p className="text-sm text-neutral-700 dark:text-neutral-300">{exploit.expectedImpact || "Not specified"}</p>
                       </div>
+                      {recommendation && (
+                        <div className="mt-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-lg">
+                          <p className="text-sm font-medium text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                            <Shield className="h-4 w-4" />
+                            Defense Recommendation
+                          </p>
+                          <p className="text-sm text-green-800 dark:text-green-200 mb-2">{recommendation.mitigation}</p>
+                          {recommendation.codeExample && (
+                            <div className="mt-2">
+                              <p className="text-xs font-medium text-green-900 dark:text-green-100 mb-1">Code Example:</p>
+                              <pre className="p-2 bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 text-xs rounded overflow-x-auto">
+                                <code>{recommendation.codeExample}</code>
+                              </pre>
+                            </div>
+                          )}
+                          {recommendation.tonSpecific && (
+                            <p className="text-xs text-green-700 dark:text-green-300 mt-2">✓ TON-specific mitigation</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

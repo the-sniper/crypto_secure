@@ -21,16 +21,18 @@ For each entry point, identify:
 - Risk factors (e.g., "unbounded input", "affects user balance", "external call", "admin-modified limits")
 - Notes about potential attack vectors
 
-Return a JSON array of attack surfaces with this structure:
-[
-  {
-    "id": "AS1",
-    "entryPoint": "function_name",
-    "riskFactors": ["risk1", "risk2"],
-    "notes": "Description of why this is an attack surface",
-    "lineNumber": 42
-  }
-]
+Return a JSON object with an "attackSurfaces" array containing attack surfaces with this structure:
+{
+  "attackSurfaces": [
+    {
+      "id": "AS1",
+      "entryPoint": "function_name",
+      "riskFactors": ["risk1", "risk2"],
+      "notes": "Description of why this is an attack surface",
+      "lineNumber": 42
+    }
+  ]
+}
 
 Be thorough but concise. Focus on functions that handle value transfers, state changes, or external interactions.`;
 
@@ -60,23 +62,25 @@ For each exploit, provide:
 - TON-specific notes if applicable
 - Actual exploit code if the attack is feasible
 
-Return a JSON array of exploit attempts:
-[
-  {
-    "id": "EXP1",
-    "attackSurfaceId": "AS1",
-    "title": "Attack Name",
-    "type": "reentrancy|access-control|economic|dos|integer-overflow|other",
-    "prerequisites": "What conditions must exist",
-    "steps": ["Step 1", "Step 2", "Step 3"],
-    "expectedImpact": "What can be stolen/abused",
-    "likelihood": "low|medium|high",
-    "tonSpecificNotes": "TON-specific considerations",
-    "exploitCode": "Actual exploit code if feasible",
-    "vulnerableLines": [42, 45],
-    "severity": "Critical|High|Medium|Low|Info"
-  }
-]
+Return a JSON object with an "exploits" array containing exploit attempts:
+{
+  "exploits": [
+    {
+      "id": "EXP1",
+      "attackSurfaceId": "AS1",
+      "title": "Attack Name",
+      "type": "reentrancy|access-control|economic|dos|integer-overflow|other",
+      "prerequisites": "What conditions must exist",
+      "steps": ["Step 1", "Step 2", "Step 3"],
+      "expectedImpact": "What can be stolen/abused",
+      "likelihood": "low|medium|high",
+      "tonSpecificNotes": "TON-specific considerations",
+      "exploitCode": "Actual exploit code if feasible",
+      "vulnerableLines": [42, 45],
+      "severity": "Critical|High|Medium|Low|Info"
+    }
+  ]
+}
 
 Be creative but realistic. Generate actual exploit code for attacks that seem feasible.`;
 
@@ -89,15 +93,17 @@ For each plausible exploit, provide specific hardening recommendations:
 
 Focus on actionable, specific recommendations that directly address each exploit.
 
-Return a JSON array of defense recommendations:
-[
-  {
-    "exploitId": "EXP1",
-    "mitigation": "Detailed explanation of how to prevent this attack",
-    "codeExample": "Code snippet showing the fix",
-    "tonSpecific": true
-  }
-]
+Return a JSON object with a "recommendations" array containing defense recommendations:
+{
+  "recommendations": [
+    {
+      "exploitId": "EXP1",
+      "mitigation": "Detailed explanation of how to prevent this attack",
+      "codeExample": "Code snippet showing the fix",
+      "tonSpecific": true
+    }
+  ]
+}
 
 Be specific and provide code examples where applicable.`;
 
@@ -116,7 +122,7 @@ ${code}
 Identified Functions:
 ${functionList}
 
-Analyze this contract and return the attack surfaces as a JSON array.`;
+Analyze this contract and return the attack surfaces in a JSON object with an "attackSurfaces" key containing the array.`;
 }
 
 export function getHackerAgentPrompt(code: string, language: string, attackSurfaces: Array<{id: string, entryPoint: string, riskFactors: string[], notes: string}>): string {
@@ -134,7 +140,7 @@ ${code}
 Attack Surfaces Identified:
 ${surfacesJson}
 
-Generate exploit attempts for these attack surfaces. Return a JSON array of exploit attempts.`;
+Generate exploit attempts for these attack surfaces. Return a JSON object with an "exploits" key containing the array of exploit attempts.`;
 }
 
 export function getDefenderAgentPrompt(code: string, exploits: Array<{id: string, title: string, type: string, prerequisites: string, steps: string[]}>): string {
@@ -150,6 +156,6 @@ ${code}
 Plausible Exploits Identified:
 ${exploitsJson}
 
-For each exploit, provide defensive recommendations. Return a JSON array of defense recommendations.`;
+For each exploit, provide defensive recommendations. Return a JSON object with a "recommendations" key containing the array of defense recommendations.`;
 }
 

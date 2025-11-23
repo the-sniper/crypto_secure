@@ -58,14 +58,17 @@ export async function enumerateAttackSurface(
     // Parse JSON response
     const parsed = JSON.parse(response);
     
-    // Handle both direct array and wrapped object
+    // Handle JSON object response (required by response_format: json_object)
     let attackSurfaces: AttackSurface[] = [];
-    if (Array.isArray(parsed)) {
-      attackSurfaces = parsed;
-    } else if (parsed.attackSurfaces && Array.isArray(parsed.attackSurfaces)) {
+    
+    // First check for the expected key
+    if (parsed.attackSurfaces && Array.isArray(parsed.attackSurfaces)) {
       attackSurfaces = parsed.attackSurfaces;
     } else if (parsed.attack_surface && Array.isArray(parsed.attack_surface)) {
       attackSurfaces = parsed.attack_surface;
+    } else if (Array.isArray(parsed)) {
+      // Fallback: direct array (shouldn't happen with json_object format)
+      attackSurfaces = parsed;
     } else {
       // Try to find any array in the response
       const keys = Object.keys(parsed);
@@ -77,15 +80,23 @@ export async function enumerateAttackSurface(
       }
     }
     
+    // If still empty, log warning
+    if (attackSurfaces.length === 0) {
+      console.warn("[Attack Surface] No attack surfaces found in AI response, using fallback");
+    }
+    
     // Validate and add IDs if missing
-    return attackSurfaces.map((as: any, index: number) => ({
+    const validated = attackSurfaces.map((as: any, index: number) => ({
       id: as.id || `AS${index + 1}`,
-      entryPoint: as.entryPoint || as.entry_point || "unknown",
+      entryPoint: as.entryPoint || as.entry_point || as.function || as.name || "unknown",
       riskFactors: Array.isArray(as.riskFactors) ? as.riskFactors : 
-                   Array.isArray(as.risk_factors) ? as.risk_factors : [],
-      notes: as.notes || as.description || "",
-      lineNumber: as.lineNumber || as.line_number || undefined
-    }));
+                   Array.isArray(as.risk_factors) ? as.risk_factors : 
+                   Array.isArray(as.risks) ? as.risks : [],
+      notes: as.notes || as.description || as.note || "",
+      lineNumber: as.lineNumber || as.line_number || as.line || undefined
+    })).filter((as: AttackSurface) => as.entryPoint !== "unknown" || as.riskFactors.length > 0);
+    
+    return validated.length > 0 ? validated : generateFallbackAttackSurfaces(functions, code);
     
   } catch (error: any) {
     console.error("Attack surface enumeration failed:", error);

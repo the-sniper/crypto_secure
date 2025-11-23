@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { ExploitAttempt, AttackSurface, Severity } from "@/types/analysis";
+import { ExploitAttempt, AttackSurface, LegacySeverity } from "@/types/analysis";
 import { getHackerAgentPrompt } from "./prompts/hacker-prompts";
 
 /**
@@ -45,23 +45,31 @@ export async function generateExploits(
     // Parse JSON response
     const parsed = JSON.parse(response);
     
-    // Handle different response formats
+    // Handle JSON object response (required by response_format: json_object)
     let exploits: any[] = [];
-    if (Array.isArray(parsed)) {
-      exploits = parsed;
-    } else if (parsed.exploits && Array.isArray(parsed.exploits)) {
+    
+    // First check for the expected key
+    if (parsed.exploits && Array.isArray(parsed.exploits)) {
       exploits = parsed.exploits;
     } else if (parsed.exploitAttempts && Array.isArray(parsed.exploitAttempts)) {
       exploits = parsed.exploitAttempts;
+    } else if (Array.isArray(parsed)) {
+      // Fallback: direct array (shouldn't happen with json_object format)
+      exploits = parsed;
     } else {
       // Try to find any array in the response
       const keys = Object.keys(parsed);
       for (const key of keys) {
         if (Array.isArray(parsed[key])) {
           exploits = parsed[key];
+          console.warn(`[Hacker Agent] Found exploits under unexpected key: ${key}`);
           break;
         }
       }
+    }
+    
+    if (exploits.length === 0) {
+      console.warn("[Hacker Agent] No exploits found in AI response");
     }
     
     // Validate and normalize exploit attempts
@@ -127,11 +135,11 @@ function normalizeLikelihood(likelihood: string): "low" | "medium" | "high" {
 }
 
 /**
- * Normalize severity to valid Severity type
+ * Normalize severity to valid LegacySeverity type
  */
-function normalizeSeverity(severity: string): Severity {
+function normalizeSeverity(severity: string): LegacySeverity {
   const normalized = severity.toLowerCase();
-  if (normalized.includes("critical") || normalized.includes("critical")) {
+  if (normalized.includes("critical")) {
     return "Critical";
   }
   if (normalized.includes("high")) {
@@ -149,7 +157,7 @@ function normalizeSeverity(severity: string): Severity {
 /**
  * Determine severity based on exploit type
  */
-function determineSeverityFromType(type: string): Severity {
+function determineSeverityFromType(type: string): LegacySeverity {
   const normalized = type.toLowerCase();
   if (normalized.includes("reentrancy") || normalized.includes("access-control")) {
     return "Critical";

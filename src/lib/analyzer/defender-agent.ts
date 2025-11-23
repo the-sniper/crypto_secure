@@ -44,23 +44,31 @@ export async function generateDefenseRecommendations(
     // Parse JSON response
     const parsed = JSON.parse(response);
     
-    // Handle different response formats
+    // Handle JSON object response (required by response_format: json_object)
     let recommendations: any[] = [];
-    if (Array.isArray(parsed)) {
-      recommendations = parsed;
-    } else if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
+    
+    // First check for the expected key
+    if (parsed.recommendations && Array.isArray(parsed.recommendations)) {
       recommendations = parsed.recommendations;
     } else if (parsed.defenses && Array.isArray(parsed.defenses)) {
       recommendations = parsed.defenses;
+    } else if (Array.isArray(parsed)) {
+      // Fallback: direct array (shouldn't happen with json_object format)
+      recommendations = parsed;
     } else {
       // Try to find any array in the response
       const keys = Object.keys(parsed);
       for (const key of keys) {
         if (Array.isArray(parsed[key])) {
           recommendations = parsed[key];
+          console.warn(`[Defender Agent] Found recommendations under unexpected key: ${key}`);
           break;
         }
       }
+    }
+    
+    if (recommendations.length === 0) {
+      console.warn("[Defender Agent] No recommendations found in AI response, using fallback");
     }
     
     // Validate and normalize recommendations
