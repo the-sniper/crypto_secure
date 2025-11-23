@@ -1031,7 +1031,7 @@ export function CodeAnalyzer() {
                             </div>
                           </div>
                           <p className="text-sm text-neutral-600 mt-3">
-                            File loaded successfully. Click "Scan for Bugs" to analyze.
+                            File loaded successfully. Click "Analyze Security" to start the analysis.
                           </p>
                         </div>
                       ) : (
@@ -1046,13 +1046,12 @@ export function CodeAnalyzer() {
                             <p className="text-sm text-neutral-600 mb-4">
                               Attach contract files (.tact, .fc, .func) up to 1MB
                             </p>
-                            <Button
+                            <button
                               onClick={() => fileInputRef.current?.click()}
-                              variant="outline"
-                              className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                              className="text-purple-600 hover:text-purple-700 underline font-medium text-sm cursor-pointer transition-colors"
                             >
                               Click to upload
-                            </Button>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -1248,7 +1247,7 @@ export function CodeAnalyzer() {
                   Analyzing Logic...
                 </>
               ) : (
-                "Scan for Bugs"
+                "Analyze Security"
               )}
             </Button>
           </div>
