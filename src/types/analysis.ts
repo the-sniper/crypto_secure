@@ -79,6 +79,7 @@ export interface AnalysisResult {
   codeQualityObservations?: string[];
   positiveFindings?: string[];
   nextSteps?: string;
+  proposedCodeComplete?: string;
 }
 
 // Legacy types for backward compatibility (if needed during migration)
