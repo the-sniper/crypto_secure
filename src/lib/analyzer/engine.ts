@@ -1,8 +1,34 @@
-import { AnalysisResult, Vulnerability } from "@/types/analysis";
+import { Vulnerability, LegacySeverity } from "@/types/analysis";
 import { RULES } from "./rules";
 import { mapFunctions } from "./utils";
 
-export function analyzeCodeStatic(rawCode: string): AnalysisResult {
+export interface StaticAnalysisResult {
+  vulnerabilities: Vulnerability[];
+  summary: string;
+  score: number;
+  stats: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  patchedCode: string;
+}
+
+function mapSeverity(s: string): LegacySeverity {
+  switch(s) {
+    case "CRITICAL": return "Critical";
+    case "HIGH": return "High";
+    case "MEDIUM": return "Medium";
+    case "LOW": return "Low";
+    case "INFORMATIONAL": return "Info";
+    default: return "Info";
+  }
+}
+
+export function analyzeCodeStatic(rawCode: string): StaticAnalysisResult {
   const cleanCode = rawCode;
   const codeLines = rawCode.split("\n"); 
   const functionMap = mapFunctions(rawCode);
@@ -31,11 +57,11 @@ export function analyzeCodeStatic(rawCode: string): AnalysisResult {
     if (isVulnerable) {
       // Deduct score
       switch (rule.severity) {
-        case "Critical": score -= 25; break;
-        case "High": score -= 15; break;
-        case "Medium": score -= 10; break;
-        case "Low": score -= 5; break;
-        case "Info": score -= 0; break;
+        case "CRITICAL": score -= 25; break;
+        case "HIGH": score -= 15; break;
+        case "MEDIUM": score -= 10; break;
+        case "LOW": score -= 5; break;
+        case "INFORMATIONAL": score -= 0; break;
       }
 
       let lineNo = 0; // 0 indicates "General/Global"
@@ -77,7 +103,7 @@ export function analyzeCodeStatic(rawCode: string): AnalysisResult {
 
       vulnerabilities.push({
         line: lineNo,
-        severity: rule.severity,
+        severity: mapSeverity(rule.severity),
         title: rule.title,
         description: rule.description,
         scenario: rule.scenario,

@@ -85,6 +85,8 @@ export interface AnalysisResult {
 // Legacy types for backward compatibility (if needed during migration)
 export type LegacySeverity = "Critical" | "High" | "Medium" | "Low" | "Info";
 
+export type Vulnerability = LegacyVulnerability;
+
 export interface LegacyVulnerability {
   line: number;
   column?: number;
