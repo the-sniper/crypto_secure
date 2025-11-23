@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { GoogleGenAI } from "@google/genai";
 
 export type AIProvider = "claude" | "openai" | "gemini";
 
@@ -25,7 +26,7 @@ class OpenAIProvider implements AIProviderInterface {
   private client: OpenAI;
   private model: string;
 
-  constructor(apiKey: string, model: string = "gpt-4o") {
+  constructor(apiKey: string, model: string = "gpt-4.1-2025-04-14") {
     this.client = new OpenAI({ apiKey });
     this.model = model;
   }
@@ -58,11 +59,13 @@ class OpenAIProvider implements AIProviderInterface {
 
 // Gemini Provider
 class GeminiProvider implements AIProviderInterface {
-  private apiKey: string;
+  private ai: GoogleGenAI;
   private model: string;
 
-  constructor(apiKey: string, model: string = "gemini-1.5-pro") {
-    this.apiKey = apiKey;
+  constructor(apiKey: string, model: string = "gemini-2.5-pro") {
+    this.ai = new GoogleGenAI({
+      apiKey: apiKey,
+    });
     this.model = model;
   }
 
@@ -73,48 +76,55 @@ class GeminiProvider implements AIProviderInterface {
     console.log(`[Gemini] Requesting completion with model: ${this.model}`);
     const startTime = Date.now();
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${this.apiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    try {
+      const config = {
+        thinkingConfig: {
+          thinkingBudget: -1,
         },
-        body: JSON.stringify({
-          contents: [
+        generationConfig: {
+          temperature: options?.temperature ?? 0.3,
+          responseMimeType: "application/json",
+        },
+      };
+
+      const contents = [
+        {
+          role: "user" as const,
+          parts: [
             {
-              parts: [
-                {
-                  text: combinedPrompt,
-                },
-              ],
+              text: combinedPrompt,
             },
           ],
-          generationConfig: {
-            temperature: options?.temperature ?? 0.3,
-            responseMimeType: "application/json",
-          },
-        }),
+        },
+      ];
+
+      const response = await this.ai.models.generateContentStream({
+        model: this.model,
+        config,
+        contents,
+      });
+
+      // Accumulate the streamed content
+      let content = "";
+      for await (const chunk of response) {
+        if (chunk.text) {
+          content += chunk.text;
+        }
       }
-    );
 
-    const duration = Date.now() - startTime;
+      const duration = Date.now() - startTime;
 
-    if (!response.ok) {
-      const error = await response.text();
+      if (!content) {
+        throw new Error("Empty response from Gemini");
+      }
+
+      console.log(`[Gemini] Response received (${duration}ms), content length: ${content.length} chars`);
+      return { content };
+    } catch (error: any) {
+      const duration = Date.now() - startTime;
       console.error(`[Gemini] API error (${duration}ms):`, error);
-      throw new Error(`Gemini API error: ${error}`);
+      throw new Error(`Gemini API error: ${error.message || error}`);
     }
-
-    const data = await response.json();
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    
-    if (!content) {
-      throw new Error("Empty response from Gemini");
-    }
-
-    console.log(`[Gemini] Response received (${duration}ms), content length: ${content.length} chars`);
-    return { content };
   }
 }
 
@@ -180,9 +190,9 @@ class ClaudeProvider implements AIProviderInterface {
 export function createAIProvider(config: AIProviderConfig): AIProviderInterface {
   switch (config.provider) {
     case "openai":
-      return new OpenAIProvider(config.apiKey, config.model || "gpt-4o");
+      return new OpenAIProvider(config.apiKey, config.model || "gpt-4.1-2025-04-14");
     case "gemini":
-      return new GeminiProvider(config.apiKey, config.model || "gemini-1.5-pro");
+      return new GeminiProvider(config.apiKey, config.model || "gemini-2.5-pro");
     case "claude":
       return new ClaudeProvider(config.apiKey, config.model || "claude-sonnet-4-20250514");
     default:
@@ -197,7 +207,7 @@ export function getProviderConfig(): AIProviderConfig | null {
     return {
       provider: "openai",
       apiKey: process.env.OPENAI_API_KEY,
-      model: process.env.OPENAI_MODEL || "gpt-4o",
+      model: process.env.OPENAI_MODEL || "gpt-4.1-2025-04-14",
     };
   }
 
@@ -206,7 +216,7 @@ export function getProviderConfig(): AIProviderConfig | null {
     return {
       provider: "gemini",
       apiKey: process.env.GEMINI_API_KEY,
-      model: process.env.GEMINI_MODEL || "gemini-1.5-pro",
+      model: process.env.GEMINI_MODEL || "gemini-2.5-pro",
     };
   }
 

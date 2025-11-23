@@ -3,12 +3,12 @@ export type Grade = "A" | "B" | "C" | "D" | "F";
 export type FindingStatus = "Open" | "Fixed" | "Mitigated" | "Accepted";
 export type RecommendationPriority = "High" | "Medium" | "Low";
 
-export interface FindingLocation {
-  function?: string;
-  lineStart: number;
-  lineEnd: number;
-  snippet?: string;
-}
+// export interface FindingLocation {
+//   function?: string;
+//   lineStart: number;
+//   lineEnd: number;
+//   snippet?: string;
+// }
 
 export interface CodeChanges {
   vulnerableCode: string;
@@ -16,6 +16,7 @@ export interface CodeChanges {
   startLine: number;
   endLine: number;
   changeDescription: string;
+  function?: string;
 }
 
 export interface Finding {
@@ -23,17 +24,14 @@ export interface Finding {
   title: string;
   severity: Severity;
   category: string;
-  status: FindingStatus;
   description: string;
-  location: FindingLocation;
   impact: string;
   exploitScenario?: string;
   recommendation: string;
-  secureCodeExample?: string;
-  codeChanges?: CodeChanges;
+  codeChanges: CodeChanges; // Required: each finding must have codeChanges
+  status?: FindingStatus;
   references?: string[];
   cwe?: string;
-  estimatedRiskScore?: number;
 }
 
 export interface AnalysisMetadata {
@@ -41,6 +39,7 @@ export interface AnalysisMetadata {
   language: string;
   linesOfCode: number;
   analysisDate: string;
+  analysisTimestamp?: string;
   analysisDuration?: string;
   totalIssuesFound: number;
 }
@@ -51,6 +50,7 @@ export interface FindingsSummary {
   medium: number;
   low: number;
   informational: number;
+  totalFindings?: number;
 }
 
 export interface Recommendation {
@@ -62,9 +62,28 @@ export interface Recommendation {
 
 export interface GasOptimization {
   location: string;
-  currentApproach: string;
-  optimizedApproach: string;
-  estimatedSavings: string;
+  description: string;
+  estimatedGasSavings: string;
+  currentApproach?: string;
+  optimizedApproach?: string;
+  estimatedSavings?: string;
+}
+
+export interface CodeQualityObservation {
+  // type: "ERROR" | "WARNING" | "INFO";
+  description: string;
+}
+
+export interface PositiveFinding {
+  aspect: string;
+  description: string;
+}
+
+export interface CompleteCodeComparison {
+  hasChanges: boolean;
+  original: string;
+  corrected: string;
+  changesExplanation: string;
 }
 
 export interface AnalysisResult {
@@ -76,8 +95,9 @@ export interface AnalysisResult {
   findings: Finding[];
   recommendations: Recommendation[];
   gasOptimizations: GasOptimization[];
-  codeQualityObservations?: string[];
-  positiveFindings?: string[];
+  completeCodeComparison?: CompleteCodeComparison;
+  codeQualityObservations?: (string | CodeQualityObservation)[];
+  positiveFindings?: (string | PositiveFinding)[];
   nextSteps?: string;
   proposedCodeComplete?: string;
 }

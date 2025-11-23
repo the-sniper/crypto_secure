@@ -33,6 +33,7 @@ import { pdf } from "@react-pdf/renderer";
 import { PdfReport } from "@/components/pdf-report";
 import { HackerPdfReport } from "@/components/hacker-pdf-report";
 import { SimpleTooltip } from "@/components/ui/simple-tooltip";
+import { detectLanguage } from "@/lib/analyzer/prompts";
 
 // Helper to map severity to display name
 const getSeverityDisplayName = (severity: string): string => {
@@ -118,8 +119,8 @@ const SeveritySection = ({
                     </div>
                     <div className="text-right ml-4">
                         <span className="text-xs font-mono opacity-60 block bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded">
-                            {finding.location.function || "global"}:{finding.location.lineStart}
-                            {finding.location.lineEnd !== finding.location.lineStart ? `-${finding.location.lineEnd}` : ""}
+                            {finding.codeChanges.function || "global"}:{finding.codeChanges.startLine}
+                            {finding.codeChanges.endLine !== finding.codeChanges.startLine ? `-${finding.codeChanges.endLine}` : ""}
                         </span>
                     </div>
                  </div>
@@ -144,17 +145,17 @@ const SeveritySection = ({
                          </div>
                      )}
                      
-                     {finding.location.snippet && (
+                     {finding.codeChanges.vulnerableCode && (
                         <div>
                             <h5 className="text-xs font-bold uppercase mb-1 text-red-600 opacity-80">Affected Code</h5>
                             <div className="bg-neutral-100 dark:bg-neutral-950 p-3 rounded border border-red-100 dark:border-red-900/30">
-                                {finding.location.function && (
-                                    <div className="text-xs font-mono text-neutral-500 mb-1">function {finding.location.function}() &#123;</div>
+                                {finding.codeChanges.function && (
+                                    <div className="text-xs font-mono text-neutral-500 mb-1">function {finding.codeChanges.function}() &#123;</div>
                                 )}
                                 <code className="text-sm font-mono block whitespace-pre-wrap text-red-700 dark:text-red-400">
-                                    {finding.location.snippet}
+                                    {finding.codeChanges.vulnerableCode}
                                 </code>
-                                {finding.location.function && (
+                                {finding.codeChanges.function && (
                                     <div className="text-xs font-mono text-neutral-500 mt-1">&#125;</div>
                                 )}
                             </div>
@@ -227,6 +228,41 @@ const isValidFileSize = (fileSize: number): boolean => {
 const isValidLanguage = (language: string | LanguageType | ""): boolean => {
   if (!language || language === "") return false;
   return ALLOWED_LANGUAGES.includes(language.toLowerCase() as LanguageType);
+};
+
+// Auto-detect language using the detectLanguage helper and map to LanguageType
+const autoDetectLanguage = (code: string): { language: LanguageType | null; error: string | null } => {
+  if (!code.trim()) {
+    return { language: null, error: null };
+  }
+
+  const detected = detectLanguage(code);
+  
+  // Map detected language to our LanguageType
+  const languageMap: Record<string, LanguageType> = {
+    'FunC': 'func',
+    'Tact': 'tact',
+  };
+  
+  const mappedLanguage = languageMap[detected];
+  
+  if (mappedLanguage) {
+    return { language: mappedLanguage, error: null };
+  }
+  
+  // If detected is 'Unknown' or not supported, return error
+  if (detected === 'Unknown') {
+    return { 
+      language: null, 
+      error: 'Unable to auto-detect language. Please manually select a language type (Tact, FC, or Func).' 
+    };
+  }
+  
+  // For any other case, return error
+  return { 
+    language: null, 
+    error: `Detected language "${detected}" is not supported. Supported languages are: Tact, FC, or Func. Please select one manually.` 
+  };
 };
 
 // Detect code language from content
@@ -756,41 +792,18 @@ export function CodeAnalyzer() {
           setActiveTab("snippet");
       }
       
-      // Auto-detect and set language
-      // First, try to use language from analysis metadata if available
-      let selectedLang: LanguageType | "" = "";
-      if (result?.analysisMetadata?.language) {
-          const metaLang = result.analysisMetadata.language.toLowerCase();
-          const languageMap: Record<string, LanguageType> = {
-              'func': 'func',
-              'tact': 'tact',
-              'fc': 'fc'
-          };
-          const mappedLang = languageMap[metaLang];
-          if (mappedLang && isValidLanguage(mappedLang)) {
-              selectedLang = mappedLang;
-          }
-      }
+      // Auto-detect and set language using detectLanguage helper
+      const { language: detectedLang, error: detectionError } = autoDetectLanguage(modifiedFix);
       
-      // Fallback to code detection if metadata language not available or invalid
-      if (!selectedLang) {
-          const detectedLang = detectCodeLanguage(modifiedFix);
-          if (detectedLang) {
-              const languageMap: Record<string, LanguageType> = {
-                  'tact': 'tact',
-                  'func': 'func',
-                  'fc': 'fc'
-              };
-              const mappedLang = languageMap[detectedLang];
-              if (mappedLang && isValidLanguage(mappedLang)) {
-                  selectedLang = mappedLang;
-              }
-          }
-      }
-      
-      // Set the language if we found one
-      if (selectedLang) {
-          setSnippetLanguage(selectedLang);
+      if (detectedLang) {
+          // Auto-select the detected language
+          setSnippetLanguage(detectedLang);
+          setCodeValidationError(null);
+          setError(null);
+      } else if (detectionError) {
+          // Show validation error if language is not supported
+          setCodeValidationError(detectionError);
+          setError(detectionError);
       }
       
       setSnippetCode(modifiedFix);
@@ -1132,19 +1145,50 @@ export function CodeAnalyzer() {
                         className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-blue-500 focus-visible:ring-blue-500/20 focus-visible:ring-[2px]"
                         value={snippetCode}
                         onChange={(e) => {
-                          setSnippetCode(e.target.value);
-                          const code = e.target.value.trim();
-                          if (code && snippetLanguage && isValidLanguage(snippetLanguage)) {
-                            const validation = validateCodeLanguage(code, snippetLanguage);
-                            if (!validation.valid) {
-                              const errorMsg = validation.message || "Code language doesn't match selected language.";
-                              setCodeValidationError(errorMsg);
-                              setError(errorMsg);
+                          const newCode = e.target.value;
+                          setSnippetCode(newCode);
+                          const code = newCode.trim();
+                          
+                          if (code) {
+                            // Auto-detect language when code is provided
+                            const { language: detectedLang, error: detectionError } = autoDetectLanguage(code);
+                            
+                            if (detectedLang) {
+                              // Auto-select the detected language
+                              setSnippetLanguage(detectedLang);
+                              // Use detected language for validation
+                              const validation = validateCodeLanguage(code, detectedLang);
+                              if (!validation.valid) {
+                                const errorMsg = validation.message || "Code language doesn't match detected language.";
+                                setCodeValidationError(errorMsg);
+                                setError(errorMsg);
+                              } else {
+                                setCodeValidationError(null);
+                                setError(null);
+                              }
+                            } else if (detectionError) {
+                              // Show validation error if language is not supported
+                              setCodeValidationError(detectionError);
+                              setError(detectionError);
                             } else {
-                              setCodeValidationError(null);
-                              setError(null);
+                              // No detection result, validate against manually selected language if any
+                              if (snippetLanguage && isValidLanguage(snippetLanguage)) {
+                                const validation = validateCodeLanguage(code, snippetLanguage);
+                                if (!validation.valid) {
+                                  const errorMsg = validation.message || "Code language doesn't match selected language.";
+                                  setCodeValidationError(errorMsg);
+                                  setError(errorMsg);
+                                } else {
+                                  setCodeValidationError(null);
+                                  setError(null);
+                                }
+                              } else {
+                                setCodeValidationError(null);
+                                setError(null);
+                              }
                             }
                           } else {
+                            // Code is empty, clear errors
                             setCodeValidationError(null);
                             setError(null);
                           }
@@ -1601,7 +1645,7 @@ export function CodeAnalyzer() {
                         "bg-blue-50/50 dark:bg-blue-900/20 border-blue-500"
                       }`}>
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-bold text-base">{rec.title}</h4>
+                          <h4 className="font-bold text-base">{rec.title || rec.category || "Recommendation"}</h4>
                           <span className={`text-xs px-2 py-1 rounded ${
                             rec.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
                             rec.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
@@ -1611,7 +1655,9 @@ export function CodeAnalyzer() {
                           </span>
                         </div>
                         <p className="text-sm opacity-90 mb-2">{rec.description}</p>
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400 italic">{rec.rationale}</p>
+                        {rec.rationale && (
+                          <p className="text-xs text-neutral-600 dark:text-neutral-400 italic">{rec.rationale}</p>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1631,23 +1677,26 @@ export function CodeAnalyzer() {
                         <div className="flex items-start justify-between mb-2">
                           <h4 className="font-bold text-base">{opt.location}</h4>
                           <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                            {opt.estimatedSavings}
+                            {opt.estimatedGasSavings ?? opt.estimatedSavings ?? "N/A"}
                           </span>
                         </div>
-                        <div className="space-y-2">
-                          <div>
-                            <div className="text-xs font-bold uppercase mb-1 text-red-600 opacity-80">Current Approach</div>
-                            <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
-                              {opt.currentApproach}
-                            </code>
+                        <p className="text-sm opacity-90">{opt.description}</p>
+                        {opt.currentApproach && opt.optimizedApproach && (
+                          <div className="space-y-2 mt-2">
+                            <div>
+                              <div className="text-xs font-bold uppercase mb-1 text-red-600 opacity-80">Current Approach</div>
+                              <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
+                                {opt.currentApproach}
+                              </code>
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold uppercase mb-1 text-green-600 opacity-80">Optimized Approach</div>
+                              <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
+                                {opt.optimizedApproach}
+                              </code>
+                            </div>
                           </div>
-                          <div>
-                            <div className="text-xs font-bold uppercase mb-1 text-green-600 opacity-80">Optimized Approach</div>
-                            <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
-                              {opt.optimizedApproach}
-                            </code>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1662,9 +1711,20 @@ export function CodeAnalyzer() {
                     Code Quality Observations
                   </h3>
                   <ul className="space-y-2 list-disc list-inside">
-                    {result.codeQualityObservations.map((obs, idx) => (
-                      <li key={idx} className="text-sm text-neutral-600 dark:text-neutral-400">{obs}</li>
-                    ))}
+                    {result.codeQualityObservations.map((obs, idx) => {
+                      const description = typeof obs === 'string' ? obs : obs.description;
+                      const type = typeof obs === 'string' ? undefined : obs.type;
+                      return (
+                        <li key={idx} className={`text-sm ${
+                          type === 'ERROR' ? 'text-red-600 dark:text-red-400' :
+                          type === 'WARNING' ? 'text-yellow-600 dark:text-yellow-400' :
+                          'text-neutral-600 dark:text-neutral-400'
+                        }`}>
+                          {type && <span className="font-semibold">[{type}] </span>}
+                          {description}
+                        </li>
+                      );
+                    })}
                   </ul>
                 </div>
               )}
@@ -1678,9 +1738,16 @@ export function CodeAnalyzer() {
                   </h3>
                   <div className="p-4 rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-900/20">
                     <ul className="space-y-2 list-disc list-inside">
-                      {result.positiveFindings.map((finding, idx) => (
-                        <li key={idx} className="text-sm text-green-700 dark:text-green-400">{finding}</li>
-                      ))}
+                      {result.positiveFindings.map((finding, idx) => {
+                        const description = typeof finding === 'string' ? finding : finding.description;
+                        const aspect = typeof finding === 'string' ? undefined : finding.aspect;
+                        return (
+                          <li key={idx} className="text-sm text-green-700 dark:text-green-400">
+                            {aspect && <span className="font-semibold">{aspect}: </span>}
+                            {description}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>

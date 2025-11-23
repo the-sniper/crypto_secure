@@ -292,7 +292,7 @@ export const PdfReport: React.FC<PdfReportProps> = ({ result }) => {
                      <Text style={styles.findingTitle}>{idx + 1}. {finding.title}</Text>
                      <Text style={[styles.findingBadge, { backgroundColor: colors.bg, color: colors.text }]}>{finding.severity}</Text>
                    </View>
-                   <Text style={styles.findingMeta}>Line {finding.location.lineStart}</Text>
+                   <Text style={styles.findingMeta}>Line {finding.codeChanges.startLine}</Text>
                 </View>
                 
                 <View style={{ marginBottom: 5 }}>
@@ -336,11 +336,13 @@ export const PdfReport: React.FC<PdfReportProps> = ({ result }) => {
                return (
                  <View key={idx} wrap={false} style={[styles.recCard, { borderLeftColor: colors.border, backgroundColor: colors.bg }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={[styles.findingTitle, { fontSize: 11 }]}>{rec.title}</Text>
+                      <Text style={[styles.findingTitle, { fontSize: 11 }]}>{rec.title || rec.category || "Recommendation"}</Text>
                       <Text style={{ fontSize: 8, color: colors.text, fontWeight: 'bold' }}>{rec.priority} Priority</Text>
                     </View>
                     <Text style={styles.text}>{rec.description}</Text>
-                    <Text style={[styles.text, { fontSize: 8, fontStyle: 'italic', marginTop: 4, opacity: 0.8 }]}>Rationale: {rec.rationale}</Text>
+                    {rec.rationale && (
+                      <Text style={[styles.text, { fontSize: 8, fontStyle: 'italic', marginTop: 4, opacity: 0.8 }]}>Rationale: {rec.rationale}</Text>
+                    )}
                  </View>
                );
              })}
@@ -355,18 +357,21 @@ export const PdfReport: React.FC<PdfReportProps> = ({ result }) => {
                <View key={idx} wrap={false} style={styles.card}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
                     <Text style={[styles.findingTitle, { fontSize: 10 }]}>{opt.location}</Text>
-                    <Text style={{ fontSize: 8, color: '#15803D', backgroundColor: '#DCFCE7', padding: 2, borderRadius: 2 }}>{opt.estimatedSavings}</Text>
+                    <Text style={{ fontSize: 8, color: '#15803D', backgroundColor: '#DCFCE7', padding: 2, borderRadius: 2 }}>{opt.estimatedGasSavings ?? opt.estimatedSavings ?? "N/A"}</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                       <Text style={[styles.label, { color: '#DC2626' }]}>CURRENT</Text>
-                       <Text style={styles.codeBlock}>{opt.currentApproach}</Text>
+                  <Text style={styles.text}>{opt.description}</Text>
+                  {opt.currentApproach && opt.optimizedApproach && (
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 5 }}>
+                      <View style={{ flex: 1 }}>
+                         <Text style={[styles.label, { color: '#DC2626' }]}>CURRENT</Text>
+                         <Text style={styles.codeBlock}>{opt.currentApproach}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                         <Text style={[styles.label, { color: '#16A34A' }]}>OPTIMIZED</Text>
+                         <Text style={styles.fixedCodeBlock}>{opt.optimizedApproach}</Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1 }}>
-                       <Text style={[styles.label, { color: '#16A34A' }]}>OPTIMIZED</Text>
-                       <Text style={styles.fixedCodeBlock}>{opt.optimizedApproach}</Text>
-                    </View>
-                  </View>
+                  )}
                </View>
              ))}
            </View>
