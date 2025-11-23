@@ -1645,7 +1645,7 @@ export function CodeAnalyzer() {
                         "bg-blue-50/50 dark:bg-blue-900/20 border-blue-500"
                       }`}>
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-bold text-base">{rec.title || rec.category || "Recommendation"}</h4>
+                          <h4 className="font-bold text-base">{rec.title || "Recommendation"}</h4>
                           <span className={`text-xs px-2 py-1 rounded ${
                             rec.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
                             rec.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
@@ -1713,14 +1713,8 @@ export function CodeAnalyzer() {
                   <ul className="space-y-2 list-disc list-inside">
                     {result.codeQualityObservations.map((obs, idx) => {
                       const description = typeof obs === 'string' ? obs : obs.description;
-                      const type = typeof obs === 'string' ? undefined : obs.type;
                       return (
-                        <li key={idx} className={`text-sm ${
-                          type === 'ERROR' ? 'text-red-600 dark:text-red-400' :
-                          type === 'WARNING' ? 'text-yellow-600 dark:text-yellow-400' :
-                          'text-neutral-600 dark:text-neutral-400'
-                        }`}>
-                          {type && <span className="font-semibold">[{type}] </span>}
+                        <li key={idx} className="text-sm text-neutral-600 dark:text-neutral-400">
                           {description}
                         </li>
                       );

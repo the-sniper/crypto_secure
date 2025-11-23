@@ -336,7 +336,7 @@ export const PdfReport: React.FC<PdfReportProps> = ({ result }) => {
                return (
                  <View key={idx} wrap={false} style={[styles.recCard, { borderLeftColor: colors.border, backgroundColor: colors.bg }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={[styles.findingTitle, { fontSize: 11 }]}>{rec.title || rec.category || "Recommendation"}</Text>
+                      <Text style={[styles.findingTitle, { fontSize: 11 }]}>{rec.title || "Recommendation"}</Text>
                       <Text style={{ fontSize: 8, color: colors.text, fontWeight: 'bold' }}>{rec.priority} Priority</Text>
                     </View>
                     <Text style={styles.text}>{rec.description}</Text>
