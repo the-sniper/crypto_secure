@@ -12,8 +12,12 @@ export interface AIResponse {
   content: string;
 }
 
+export interface AIOptions {
+  temperature?: number;
+}
+
 export interface AIProviderInterface {
-  generateResponse(systemPrompt: string, userPrompt: string): Promise<AIResponse>;
+  generateResponse(systemPrompt: string, userPrompt: string, options?: AIOptions): Promise<AIResponse>;
 }
 
 // OpenAI Provider
@@ -26,7 +30,7 @@ class OpenAIProvider implements AIProviderInterface {
     this.model = model;
   }
 
-  async generateResponse(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+  async generateResponse(systemPrompt: string, userPrompt: string, options?: AIOptions): Promise<AIResponse> {
     console.log(`[OpenAI] Requesting completion with model: ${this.model}`);
     const startTime = Date.now();
     
@@ -36,7 +40,7 @@ class OpenAIProvider implements AIProviderInterface {
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt }
       ],
-      temperature: 0.3,
+      temperature: options?.temperature ?? 0.3,
       response_format: { type: "json_object" },
     });
 
@@ -62,7 +66,7 @@ class GeminiProvider implements AIProviderInterface {
     this.model = model;
   }
 
-  async generateResponse(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+  async generateResponse(systemPrompt: string, userPrompt: string, options?: AIOptions): Promise<AIResponse> {
     // Combine system and user prompts for Gemini (it doesn't have separate system messages)
     const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`;
     
@@ -87,7 +91,7 @@ class GeminiProvider implements AIProviderInterface {
             },
           ],
           generationConfig: {
-            temperature: 0.3,
+            temperature: options?.temperature ?? 0.3,
             responseMimeType: "application/json",
           },
         }),
@@ -124,7 +128,7 @@ class ClaudeProvider implements AIProviderInterface {
     this.model = model;
   }
 
-  async generateResponse(systemPrompt: string, userPrompt: string): Promise<AIResponse> {
+  async generateResponse(systemPrompt: string, userPrompt: string, options?: AIOptions): Promise<AIResponse> {
     // Enhance system prompt to ensure JSON response for Claude
     const enhancedSystemPrompt = `${systemPrompt}\n\nIMPORTANT: You must respond with ONLY valid JSON. Do not include any markdown formatting, code blocks, or explanatory text outside the JSON.`;
 
@@ -141,6 +145,7 @@ class ClaudeProvider implements AIProviderInterface {
       body: JSON.stringify({
         model: this.model,
         max_tokens: 16384,
+        temperature: options?.temperature ?? 0.3,
         system: enhancedSystemPrompt,
         messages: [
           {

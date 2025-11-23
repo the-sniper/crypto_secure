@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { AIProviderInterface } from "./ai-providers";
 import { AttackSurface } from "@/types/analysis";
 import { mapFunctions } from "./utils";
 import { getAttackSurfacePrompt } from "./prompts/hacker-prompts";
@@ -10,7 +10,7 @@ import { getAttackSurfacePrompt } from "./prompts/hacker-prompts";
 export async function enumerateAttackSurface(
   code: string,
   language: string,
-  apiKey: string
+  provider: AIProviderInterface
 ): Promise<AttackSurface[]> {
   // Parse contract structure
   const functions = mapFunctions(code);
@@ -28,29 +28,16 @@ export async function enumerateAttackSurface(
     tonHandlers
   };
   
-  // Call AI to identify attack surfaces
-  const openai = new OpenAI({ apiKey });
-  
   try {
     const prompt = getAttackSurfacePrompt(code, language, functions);
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a security researcher specializing in TON smart contract security. Always return valid JSON arrays."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    });
+    const aiResponse = await provider.generateResponse(
+      "You are a security researcher specializing in TON smart contract security. Always return valid JSON arrays.",
+      prompt,
+      { temperature: 0.1 } // Low temperature for deterministic analysis
+    );
     
-    const response = completion.choices[0].message.content;
+    const response = aiResponse.content;
     if (!response) {
       throw new Error("Empty response from AI");
     }

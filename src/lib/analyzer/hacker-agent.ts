@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { AIProviderInterface } from "./ai-providers";
 import { ExploitAttempt, AttackSurface, LegacySeverity } from "@/types/analysis";
 import { getHackerAgentPrompt } from "./prompts/hacker-prompts";
 
@@ -10,34 +10,21 @@ export async function generateExploits(
   code: string,
   language: string,
   attackSurfaces: AttackSurface[],
-  apiKey: string
+  provider: AIProviderInterface
 ): Promise<ExploitAttempt[]> {
   if (attackSurfaces.length === 0) {
     return [];
   }
   
-  const openai = new OpenAI({ apiKey });
-  
   try {
     const prompt = getHackerAgentPrompt(code, language, attackSurfaces);
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a malicious attacker trying to exploit TON smart contracts. Think creatively and find novel attack vectors. Always return valid JSON arrays."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.9, // Higher temperature for creativity
-      response_format: { type: "json_object" }
-    });
+    const aiResponse = await provider.generateResponse(
+      "You are a malicious attacker trying to exploit TON smart contracts. Think creatively and find novel attack vectors. Always return valid JSON arrays.",
+      prompt
+    );
     
-    const response = completion.choices[0].message.content;
+    const response = aiResponse.content;
     if (!response) {
       throw new Error("Empty response from AI");
     }

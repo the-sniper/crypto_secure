@@ -16,8 +16,14 @@ Analyze the contract code and identify:
 4. TON-specific handlers (tick-tock, on-bounce handlers)
 5. Trust boundaries (who is assumed honest, which externals are trusted)
 
+CRITICAL INSTRUCTION: You MUST break down complex handlers like 'recv_internal' or 'recv_external' into their specific operations if they handle multiple op-codes.
+For example, do NOT just return "recv_internal". Instead, return separate attack surfaces for:
+- "recv_internal - deposit (op=1)"
+- "recv_internal - withdraw (op=2)"
+- "recv_internal - transfer (op=3)"
+
 For each entry point, identify:
-- Function name or handler type
+- Function name or handler type (include specific op/action if applicable)
 - Risk factors (e.g., "unbounded input", "affects user balance", "external call", "admin-modified limits")
 - Notes about potential attack vectors
 

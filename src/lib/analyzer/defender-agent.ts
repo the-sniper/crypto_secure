@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { AIProviderInterface } from "./ai-providers";
 import { DefenseRecommendation, ExploitAttempt } from "@/types/analysis";
 import { getDefenderAgentPrompt } from "./prompts/hacker-prompts";
 
@@ -9,34 +9,21 @@ import { getDefenderAgentPrompt } from "./prompts/hacker-prompts";
 export async function generateDefenseRecommendations(
   code: string,
   plausibleExploits: ExploitAttempt[],
-  apiKey: string
+  provider: AIProviderInterface
 ): Promise<DefenseRecommendation[]> {
   if (plausibleExploits.length === 0) {
     return [];
   }
   
-  const openai = new OpenAI({ apiKey });
-  
   try {
     const prompt = getDefenderAgentPrompt(code, plausibleExploits);
     
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: "You are a security expert helping developers defend against attacks. Provide specific, actionable recommendations with code examples. Always return valid JSON arrays."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      response_format: { type: "json_object" }
-    });
+    const aiResponse = await provider.generateResponse(
+      "You are a security expert helping developers defend against attacks. Provide specific, actionable recommendations with code examples. Always return valid JSON arrays.",
+      prompt
+    );
     
-    const response = completion.choices[0].message.content;
+    const response = aiResponse.content;
     if (!response) {
       throw new Error("Empty response from AI");
     }

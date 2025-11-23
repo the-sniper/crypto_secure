@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import OpenAI from "openai";
 import { HackerModeResult, ExploitAttempt } from "@/types/analysis";
 import { enumerateAttackSurface } from "@/lib/analyzer/attack-surface";
 import { generateExploits } from "@/lib/analyzer/hacker-agent";
 import { validateExploitFeasibility } from "@/lib/analyzer/feasibility-check";
 import { generateDefenseRecommendations } from "@/lib/analyzer/defender-agent";
+import { getProviderConfig, createAIProvider } from "@/lib/analyzer/ai-providers";
 
 // Simple rate limiting (in-memory for MVP)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
@@ -148,19 +148,21 @@ export async function POST(req: Request) {
       );
     }
     
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    const providerConfig = getProviderConfig();
+    if (!providerConfig) {
       return NextResponse.json(
         { 
           error: "AI service not configured",
-          details: "Please set OPENAI_API_KEY in your .env.local file. Get your API key from https://platform.openai.com/api-keys"
+          details: "Please configure an AI provider (OpenAI, Gemini, or Claude) in your .env.local file."
         },
         { status: 500 }
       );
     }
+
+    const provider = createAIProvider(providerConfig);
     
     // Stage 1: Attack Surface Enumeration
-    const attackSurface = await enumerateAttackSurface(code, language, apiKey);
+    const attackSurface = await enumerateAttackSurface(code, language, provider);
     
     if (attackSurface.length === 0) {
       return NextResponse.json({
@@ -174,7 +176,7 @@ export async function POST(req: Request) {
     }
     
     // Stage 2: Exploit Generation
-    const rawExploits = await generateExploits(code, language, attackSurface, apiKey);
+    const rawExploits = await generateExploits(code, language, attackSurface, provider);
     
     if (rawExploits.length === 0) {
       return NextResponse.json({
@@ -194,7 +196,7 @@ export async function POST(req: Request) {
     const plausibleExploits = validatedExploits.filter(e => e.status === "plausible");
     
     // Stage 4: Defensive Recommendations
-    const recommendations = await generateDefenseRecommendations(code, plausibleExploits, apiKey);
+    const recommendations = await generateDefenseRecommendations(code, plausibleExploits, provider);
     
     // Stage 5: Calculate Hacker Resilience Score
     const hackerResilienceScore = calculateHackerResilienceScore(validatedExploits);

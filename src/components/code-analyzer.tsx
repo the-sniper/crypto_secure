@@ -530,6 +530,7 @@ export function CodeAnalyzer() {
     
     setIsAnalyzing(true);
     setResult(null);
+    setHackerResult(null); // Clear previous hacker results to ensure fresh state
     setError(null);
     setShowDiff(false);
     setIsEditingFix(false);
@@ -813,6 +814,7 @@ export function CodeAnalyzer() {
 
     setIsHacking(true);
     setHackerResult(null);
+    setResult(null); // Clear previous standard results to ensure fresh state
     setHackerStep(0);
     setShowDiff(false);
     setIsEditingFix(false);
