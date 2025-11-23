@@ -1,9 +1,93 @@
-export type Severity = "Critical" | "High" | "Medium" | "Low" | "Info";
+export type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFORMATIONAL";
+export type Grade = "A" | "B" | "C" | "D" | "F";
+export type FindingStatus = "Open" | "Fixed" | "Mitigated" | "Accepted";
+export type RecommendationPriority = "High" | "Medium" | "Low";
 
-export interface Vulnerability {
+export interface FindingLocation {
+  function?: string;
+  lineStart: number;
+  lineEnd: number;
+  snippet?: string;
+}
+
+export interface CodeChanges {
+  vulnerableCode: string;
+  fixedCode: string;
+  startLine: number;
+  endLine: number;
+  changeDescription: string;
+}
+
+export interface Finding {
+  id: string;
+  title: string;
+  severity: Severity;
+  category: string;
+  status: FindingStatus;
+  description: string;
+  location: FindingLocation;
+  impact: string;
+  exploitScenario?: string;
+  recommendation: string;
+  secureCodeExample?: string;
+  codeChanges?: CodeChanges;
+  references?: string[];
+  cwe?: string;
+  estimatedRiskScore?: number;
+}
+
+export interface AnalysisMetadata {
+  contractName: string;
+  language: string;
+  linesOfCode: number;
+  analysisDate: string;
+  analysisDuration?: string;
+  totalIssuesFound: number;
+}
+
+export interface FindingsSummary {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  informational: number;
+}
+
+export interface Recommendation {
+  priority: RecommendationPriority;
+  title: string;
+  description: string;
+  rationale: string;
+}
+
+export interface GasOptimization {
+  location: string;
+  currentApproach: string;
+  optimizedApproach: string;
+  estimatedSavings: string;
+}
+
+export interface AnalysisResult {
+  analysisMetadata: AnalysisMetadata;
+  securityScore: number;
+  grade: Grade;
+  executiveSummary: string;
+  findingsSummary: FindingsSummary;
+  findings: Finding[];
+  recommendations: Recommendation[];
+  gasOptimizations: GasOptimization[];
+  codeQualityObservations?: string[];
+  positiveFindings?: string[];
+  nextSteps?: string;
+}
+
+// Legacy types for backward compatibility (if needed during migration)
+export type LegacySeverity = "Critical" | "High" | "Medium" | "Low" | "Info";
+
+export interface LegacyVulnerability {
   line: number;
   column?: number;
-  severity: Severity;
+  severity: LegacySeverity;
   title: string;
   description: string;
   suggestion: string;
@@ -13,24 +97,9 @@ export interface Vulnerability {
   function?: string; 
 }
 
-export interface AnalysisResult {
-  vulnerabilities: Vulnerability[];
-  summary: string;
-  score: number;
-  stats: {
-    total: number;
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
-  patchedCode?: string; // The auto-fixed code
-}
-
 export interface AttackSurface {
   id: string;
-  entryPoint: string; // Function name
+  entryPoint: string; 
   riskFactors: string[];
   notes: string;
   lineNumber?: number;
@@ -60,7 +129,55 @@ export interface DefenseRecommendation {
 }
 
 export interface HackerModeResult {
-  hackerResilienceScore: number; // 0-100
+  hackerResilienceScore: number;
+  attackSurface: AttackSurface[];
+  exploits: ExploitAttempt[];
+  summary: string;
+  score: number;
+  stats: {
+    total: number;
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    info: number;
+  };
+  patchedCode?: string;
+}
+
+export interface AttackSurface {
+  id: string;
+  entryPoint: string; 
+  riskFactors: string[];
+  notes: string;
+  lineNumber?: number;
+}
+
+export interface ExploitAttempt {
+  id: string;
+  attackSurfaceId: string;
+  title: string;
+  type: "reentrancy" | "access-control" | "economic" | "dos" | "integer-overflow" | "other";
+  prerequisites: string;
+  steps: string[];
+  expectedImpact: string;
+  likelihood: "low" | "medium" | "high";
+  status: "plausible" | "theoretical" | "not-applicable";
+  exploitCode?: string;
+  vulnerableLines?: number[];
+  tonSpecificNotes?: string;
+  severity: Severity;
+}
+
+export interface DefenseRecommendation {
+  exploitId: string;
+  mitigation: string;
+  codeExample?: string;
+  tonSpecific?: boolean;
+}
+
+export interface HackerModeResult {
+  hackerResilienceScore: number; 
   attackSurface: AttackSurface[];
   exploits: ExploitAttempt[];
   summary: string;
