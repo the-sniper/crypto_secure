@@ -19,28 +19,46 @@ import {
   Upload,
   FileCode,
   X,
-  FileText
+  FileText,
+  ArrowRight,
+  Shield,
+  Award,
+  FileCheck
 } from "lucide-react";
-import { AnalysisResult, Vulnerability } from "@/types/analysis";
+import { AnalysisResult, Finding } from "@/types/analysis";
 import { CodeDiffViewer } from "@/components/code-diff-viewer";
+
+// Helper to map severity to display name
+const getSeverityDisplayName = (severity: string): string => {
+  const map: Record<string, string> = {
+    "CRITICAL": "Critical",
+    "HIGH": "High",
+    "MEDIUM": "Medium",
+    "LOW": "Low",
+    "INFORMATIONAL": "Informational"
+  };
+  return map[severity] || severity;
+};
 
 // Internal Component for Severity Section (Accordion)
 const SeveritySection = ({ 
   severity, 
   count, 
-  vulnerabilities, 
+  findings, 
   icon: Icon,
   colorClass,
   bgClass,
-  borderClass
+  borderClass,
+  originalCode
 }: { 
   severity: string, 
   count: number, 
-  vulnerabilities: Vulnerability[],
+  findings: Finding[],
   icon: any,
   colorClass: string,
   bgClass: string,
-  borderClass: string
+  borderClass: string,
+  originalCode: string
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   
@@ -55,7 +73,7 @@ const SeveritySection = ({
        >
           <div className="flex items-center gap-3">
             <Icon className={`h-5 w-5 ${colorClass}`} />
-            <span className="font-semibold text-lg">{severity} Severity</span>
+            <span className="font-semibold text-lg">{getSeverityDisplayName(severity)} Severity</span>
           </div>
           <div className="flex items-center gap-3">
             <span className={`px-2.5 py-0.5 rounded text-xs font-bold bg-black/5 dark:bg-white/10 border border-black/5`}>
@@ -67,53 +85,112 @@ const SeveritySection = ({
        
        {isOpen && (
          <div className="p-4 space-y-4 bg-neutral-50/50 dark:bg-neutral-900/50 border-t">
-            {vulnerabilities.map((vuln, idx) => (
-              <div key={idx} className={`bg-white dark:bg-neutral-900 p-4 rounded-lg border-l-4 shadow-sm ${borderClass}`}>
+            {findings.map((finding) => (
+              <div key={finding.id} className={`bg-white dark:bg-neutral-900 p-4 rounded-lg border-l-4 shadow-sm ${borderClass}`}>
                  <div className="flex justify-between items-start mb-3">
-                    <h4 className="font-bold text-base">{vuln.title}</h4>
-                    <div className="text-right">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-bold text-base">{finding.title}</h4>
+                        <span className="text-xs px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                          {finding.id}
+                        </span>
+                        {finding.category && (
+                          <span className="text-xs px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
+                            {finding.category}
+                          </span>
+                        )}
+                      </div>
+                      {finding.status && (
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          finding.status === "Fixed" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" :
+                          finding.status === "Mitigated" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                          "bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400"
+                        }`}>
+                          {finding.status}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right ml-4">
                         <span className="text-xs font-mono opacity-60 block bg-neutral-100 dark:bg-neutral-800 px-2 py-1 rounded">
-                            {vuln.fileName || "contract.fc"}:{vuln.line}
+                            {finding.location.function || "global"}:{finding.location.lineStart}
+                            {finding.location.lineEnd !== finding.location.lineStart ? `-${finding.location.lineEnd}` : ""}
                         </span>
                     </div>
                  </div>
                  
                  <div className="space-y-3">
                      <div>
-                         <h5 className={`text-xs font-bold uppercase mb-1 ${colorClass} opacity-80`}>Impact</h5>
-                         <p className="text-sm opacity-90">{vuln.description}</p>
+                         <h5 className={`text-xs font-bold uppercase mb-1 ${colorClass} opacity-80`}>Description</h5>
+                         <p className="text-sm opacity-90">{finding.description}</p>
                      </div>
 
-                     {vuln.scenario && (
+                     {finding.impact && (
+                         <div>
+                             <h5 className={`text-xs font-bold uppercase mb-1 ${colorClass} opacity-80`}>Impact</h5>
+                             <p className="text-sm opacity-90">{finding.impact}</p>
+                         </div>
+                     )}
+
+                     {finding.exploitScenario && (
                          <div className="border-l-2 border-blue-400 pl-3 py-1 my-2">
-                             <h5 className="text-xs font-bold uppercase mb-1 text-blue-600">Scenario</h5>
-                             <p className="text-sm opacity-90 text-neutral-600 dark:text-neutral-400">{vuln.scenario}</p>
+                             <h5 className="text-xs font-bold uppercase mb-1 text-blue-600">Exploit Scenario</h5>
+                             <p className="text-sm opacity-90 text-neutral-600 dark:text-neutral-400">{finding.exploitScenario}</p>
                          </div>
                      )}
                      
-                     {vuln.affectedCode && (
+                     {finding.location.snippet && (
                         <div>
                             <h5 className="text-xs font-bold uppercase mb-1 text-red-600 opacity-80">Affected Code</h5>
                             <div className="bg-neutral-100 dark:bg-neutral-950 p-3 rounded border border-red-100 dark:border-red-900/30">
-                                {vuln.function && (
-                                    <div className="text-xs font-mono text-neutral-500 mb-1">function {vuln.function}() &#123;</div>
+                                {finding.location.function && (
+                                    <div className="text-xs font-mono text-neutral-500 mb-1">function {finding.location.function}() &#123;</div>
                                 )}
                                 <code className="text-sm font-mono block whitespace-pre-wrap text-red-700 dark:text-red-400">
-                                    {vuln.affectedCode}
+                                    {finding.location.snippet}
                                 </code>
-                                {vuln.function && (
+                                {finding.location.function && (
                                     <div className="text-xs font-mono text-neutral-500 mt-1">&#125;</div>
                                 )}
                             </div>
                         </div>
                      )}
 
-                     <div className="bg-neutral-50 dark:bg-neutral-950 p-3 rounded border border-black/5 mt-2">
-                        <h5 className="text-xs font-bold uppercase mb-1 text-green-600">Proposed Fix</h5>
-                        <code className="text-sm font-mono block whitespace-pre-wrap text-neutral-700 dark:text-neutral-300">
-                          {vuln.suggestion}
-                        </code>
-                     </div>
+                     {finding.codeChanges && finding.codeChanges.fixedCode && (
+                        <div>
+                            <h5 className="text-xs font-bold uppercase mb-1 text-green-600 opacity-80">Fixed Code</h5>
+                            <div className="bg-neutral-50 dark:bg-neutral-950 p-3 rounded border border-green-100 dark:border-green-900/30">
+                                <code className="text-sm font-mono block whitespace-pre-wrap text-green-700 dark:text-green-400">
+                                    {finding.codeChanges.fixedCode}
+                                </code>
+                            </div>
+                            {finding.codeChanges.changeDescription && (
+                                <div className="text-xs text-neutral-600 dark:text-neutral-400 italic mt-2">
+                                    {finding.codeChanges.changeDescription}
+                                </div>
+                            )}
+                        </div>
+                     )}
+
+                     {(finding.references && finding.references.length > 0) && (
+                        <div>
+                            <h5 className="text-xs font-bold uppercase mb-1 text-neutral-600 opacity-80">References</h5>
+                            <ul className="text-xs space-y-1">
+                                {finding.references.map((ref, idx) => (
+                                    <li key={idx} className="text-blue-600 dark:text-blue-400">
+                                        <a href={ref} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                            {ref}
+                                        </a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                     )}
+
+                     {finding.cwe && (
+                        <div className="text-xs text-neutral-500">
+                            <span className="font-semibold">CWE:</span> {finding.cwe}
+                        </div>
+                     )}
                  </div>
               </div>
             ))}
@@ -268,6 +345,7 @@ export function CodeAnalyzer() {
   const [showDiff, setShowDiff] = useState(false);
   const [isEditingFix, setIsEditingFix] = useState(false);
   const [modifiedFix, setModifiedFix] = useState("");
+  const [diffViewMode, setDiffViewMode] = useState<"unified" | "side-by-side">("unified");
 
   // Refs for sync scrolling
   const diffViewerRef = useRef<{ scrollTo: (top: number) => void }>(null);
@@ -464,7 +542,11 @@ export function CodeAnalyzer() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: currentCode }),
+        body: JSON.stringify({ 
+          code: currentCode,
+          filename: activeTab === "upload" ? uploadedFile?.name : undefined,
+          contractName: activeTab === "snippet" ? "contract" : undefined
+        }),
       });
 
       const data = await response.json();
@@ -489,12 +571,150 @@ export function CodeAnalyzer() {
     }
   };
 
-  const handleReviewClick = () => {
-      if (result?.patchedCode) {
-          setModifiedFix(result.patchedCode);
-          setShowDiff(true);
-          setIsEditingFix(false);
+  // Normalize code for comparison
+  const normalizeCode = (code: string): string => {
+    return code
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n')
+      .split('\n')
+      .map(line => line.trimEnd())
+      .join('\n');
+  };
+
+  // Find the position of vulnerable code in the original code
+  const findCodePosition = (originalCode: string, vulnerableCode: string): { startIdx: number; endIdx: number } | null => {
+    const normalizedOriginal = normalizeCode(originalCode);
+    const normalizedVulnerable = normalizeCode(vulnerableCode);
+    
+    // Try to find exact match first
+    const exactMatch = normalizedOriginal.indexOf(normalizedVulnerable);
+    if (exactMatch !== -1) {
+      // Calculate line indices
+      const beforeMatch = normalizedOriginal.substring(0, exactMatch);
+      const startLine = beforeMatch.split('\n').length - 1;
+      const endLine = startLine + normalizedVulnerable.split('\n').length - 1;
+      
+      return {
+        startIdx: startLine,
+        endIdx: endLine
+      };
+    }
+    
+    // Try to find by matching lines (more flexible)
+    const originalLines = normalizedOriginal.split('\n');
+    const vulnerableLines = normalizedVulnerable.split('\n').filter(line => line.trim().length > 0);
+    
+    if (vulnerableLines.length === 0) return null;
+    
+    // Find the first matching line
+    for (let i = 0; i < originalLines.length; i++) {
+      const originalLine = originalLines[i].trim();
+      const firstVulnerableLine = vulnerableLines[0].trim();
+      
+      if (originalLine.includes(firstVulnerableLine) || firstVulnerableLine.includes(originalLine)) {
+        // Check if subsequent lines match
+        let matchCount = 0;
+        for (let j = 0; j < vulnerableLines.length && (i + j) < originalLines.length; j++) {
+          const origLine = originalLines[i + j].trim();
+          const vulnLine = vulnerableLines[j].trim();
+          
+          if (origLine.includes(vulnLine) || vulnLine.includes(origLine) || origLine === vulnLine) {
+            matchCount++;
+          } else {
+            break;
+          }
+        }
+        
+        // If we matched at least 80% of the vulnerable lines, consider it a match
+        if (matchCount >= Math.ceil(vulnerableLines.length * 0.8)) {
+          return {
+            startIdx: i,
+            endIdx: i + matchCount - 1
+          };
+        }
       }
+    }
+    
+    return null;
+  };
+
+  // Apply all code changes from findings to generate complete modified code
+  const applyAllFixes = (originalCode: string, findings: Finding[]): string => {
+    const codeLines = originalCode.split('\n');
+    const findingsWithChanges = findings
+      .filter(f => f.codeChanges && f.codeChanges.vulnerableCode && f.codeChanges.fixedCode)
+      .map(finding => {
+        if (!finding.codeChanges) return null;
+        
+        // Try to find the code position by content matching
+        const position = findCodePosition(originalCode, finding.codeChanges.vulnerableCode);
+        
+        // Fallback to line numbers if content matching fails
+        let startIdx: number;
+        let endIdx: number;
+        
+        if (position) {
+          startIdx = position.startIdx;
+          endIdx = position.endIdx;
+        } else if (finding.codeChanges.startLine && finding.codeChanges.endLine) {
+          // Use line numbers as fallback, but validate they're within bounds
+          startIdx = Math.max(0, finding.codeChanges.startLine - 1);
+          endIdx = Math.min(codeLines.length - 1, finding.codeChanges.endLine - 1);
+          
+          // Validate that the code at these lines roughly matches
+          const codeAtLines = codeLines.slice(startIdx, endIdx + 1).join('\n');
+          const normalizedCodeAtLines = normalizeCode(codeAtLines);
+          const normalizedVulnerable = normalizeCode(finding.codeChanges.vulnerableCode);
+          
+          // If the code doesn't match at all, skip this finding
+          if (!normalizedCodeAtLines.includes(normalizedVulnerable) && 
+              !normalizedVulnerable.includes(normalizedCodeAtLines)) {
+            console.warn(`Finding ${finding.id}: Code at lines ${startIdx + 1}-${endIdx + 1} doesn't match vulnerable code. Skipping.`);
+            return null;
+          }
+        } else {
+          console.warn(`Finding ${finding.id}: No valid position found. Skipping.`);
+          return null;
+        }
+        
+        return {
+          finding,
+          startIdx,
+          endIdx,
+          fixedCode: finding.codeChanges.fixedCode
+        };
+      })
+      .filter((item): item is { finding: Finding; startIdx: number; endIdx: number; fixedCode: string } => item !== null)
+      .sort((a, b) => {
+        // Sort by start index descending to avoid offset issues when applying changes
+        return b.startIdx - a.startIdx;
+      });
+
+    let modifiedLines = [...codeLines];
+
+    for (const { startIdx, endIdx, fixedCode } of findingsWithChanges) {
+      // Split fixed code into lines
+      const fixedLines = fixedCode.split('\n');
+      
+      // Replace the lines (endIdx is inclusive, so we need endIdx - startIdx + 1)
+      const linesToRemove = endIdx - startIdx + 1;
+      modifiedLines.splice(startIdx, linesToRemove, ...fixedLines);
+    }
+
+    return modifiedLines.join('\n');
+  };
+
+  const handleReviewClick = () => {
+      if (!result || !result.findings.some(f => f.codeChanges)) {
+          return;
+      }
+      
+      const originalCode = getCurrentCode();
+      const completeModifiedCode = applyAllFixes(originalCode, result.findings);
+      
+      setModifiedFix(completeModifiedCode);
+      setShowDiff(true);
+      setIsEditingFix(false);
   };
 
   const handleAcceptFix = () => {
@@ -784,6 +1004,8 @@ export function CodeAnalyzer() {
                                         originalCode={getCurrentCode()} 
                                         patchedCode={modifiedFix} 
                                         onScroll={handleDiffScroll}
+                                        viewMode={diffViewMode}
+                                        onViewModeChange={setDiffViewMode}
                                     />
                                 </div>
                             </div>
@@ -817,13 +1039,18 @@ export function CodeAnalyzer() {
                      </div>
                  ) : (
                      <>
-                        <CodeDiffViewer originalCode={getCurrentCode()} patchedCode={modifiedFix} />
+                        <CodeDiffViewer 
+                            originalCode={getCurrentCode()} 
+                            patchedCode={modifiedFix}
+                            viewMode={diffViewMode}
+                            onViewModeChange={setDiffViewMode}
+                        />
                         <div className="flex justify-between items-center mt-4">
                             <Button variant="outline" onClick={() => setIsEditingFix(true)} className="border-neutral-300">
                                 <Pencil className="mr-2 h-4 w-4" /> Edit Proposed Code
                             </Button>
                             <div className="flex gap-3">
-                                <Button variant="ghost" onClick={() => setShowDiff(false)}>
+                                <Button onClick={() => setShowDiff(false)} className="bg-red-500 hover:bg-red-600 text-white">
                                     Deny / Cancel
                                 </Button>
                                 <Button onClick={handleAcceptFix} className="bg-green-600 hover:bg-green-700 text-white">
@@ -838,14 +1065,14 @@ export function CodeAnalyzer() {
           
           {!showDiff && (
             <div className="flex justify-end gap-3">
-                {result && result.patchedCode && result.vulnerabilities.length > 0 && (
+                {result && result.findings.some(f => f.codeChanges) && (
                     <Button 
                         variant="outline"
                         onClick={handleReviewClick}
                         className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:text-blue-800"
                     >
                         <Wand2 className="mr-2 h-4 w-4" />
-                        Review Auto-Fixes
+                        Review Code Fixes
                     </Button>
                 )}
                 <Button 
@@ -876,39 +1103,120 @@ export function CodeAnalyzer() {
           {result && !showDiff && (
             <div className="space-y-8 animate-in fade-in slide-in-from-top-4">
               
-              {/* 1. Executive Summary & Score */}
-              <div className="grid gap-6 md:grid-cols-[1fr_200px]">
-                <div className="p-5 rounded-xl border bg-gradient-to-br from-white to-neutral-50 dark:from-neutral-900 dark:to-neutral-950 shadow-sm">
-                  <h3 className="font-bold text-lg mb-2">Scan Results</h3>
-                  <p className="text-neutral-600 dark:text-neutral-400">{result.summary}</p>
-                </div>
-                <div className={`p-5 rounded-xl border flex flex-col items-center justify-center ${
-                  result.score > 80 ? "bg-green-50 border-green-200 text-green-700" :
-                  result.score > 50 ? "bg-yellow-50 border-yellow-200 text-yellow-700" :
-                  "bg-red-50 border-red-200 text-red-700"
-                }`}>
-                  <div className="text-5xl font-black tracking-tighter">{result.score}</div>
-                  <div className="text-xs font-bold uppercase tracking-widest opacity-70 mt-1">Security Score</div>
+              {/* 1. Executive Summary, Score & Grade - Redesigned */}
+              <div className="relative">
+                {/* Background gradient overlay */}
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 dark:from-purple-950/20 dark:via-blue-950/20 dark:to-indigo-950/20 rounded-2xl -z-10"></div>
+                
+                <div className="grid gap-6 lg:grid-cols-12 p-6">
+                  {/* Executive Summary - Takes more space */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">
+                        <FileCheck className="h-5 w-5" />
+                      </div>
+                      <h3 className="font-bold text-xl text-neutral-900 dark:text-neutral-100">Executive Summary</h3>
+                    </div>
+                    <div className="bg-white/80 dark:bg-neutral-900/80 backdrop-blur-sm rounded-xl p-5 border border-neutral-200/50 dark:border-neutral-800/50 shadow-sm">
+                      <p className="text-neutral-700 dark:text-neutral-300 leading-relaxed whitespace-pre-line text-sm">
+                        {result.executiveSummary}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Score & Grade Cards - Side by side */}
+                  <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+                    {/* Security Score Card */}
+                    <div className={`relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:scale-105 ${
+                      result.securityScore >= 90 
+                        ? "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white" :
+                      result.securityScore >= 75 
+                        ? "bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 text-white" :
+                      result.securityScore >= 60 
+                        ? "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white" :
+                      result.securityScore >= 40 
+                        ? "bg-gradient-to-br from-red-500 to-rose-600 border-red-400 text-white" :
+                      "bg-gradient-to-br from-red-600 to-red-800 border-red-500 text-white"
+                    }`}>
+                      {/* Decorative pattern */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+                      
+                      <div className="relative p-6 flex flex-col items-center justify-center h-full">
+                        <div className="mb-2 p-2 rounded-full bg-white/20 backdrop-blur-sm">
+                          <Shield className="h-6 w-6" />
+                        </div>
+                        <div className="text-6xl font-black tracking-tight mb-1 drop-shadow-lg">
+                          {result.securityScore}
+                        </div>
+                        <div className="text-xs font-semibold uppercase tracking-widest opacity-90">
+                          Security Score
+                        </div>
+                        <div className="mt-3 text-xs opacity-75">
+                          out of 100
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Grade Card */}
+                    <div className={`relative overflow-hidden rounded-2xl border-2 shadow-lg transition-all hover:scale-105 ${
+                      result.grade === "A" 
+                        ? "bg-gradient-to-br from-green-500 to-emerald-600 border-green-400 text-white" :
+                      result.grade === "B" 
+                        ? "bg-gradient-to-br from-yellow-400 to-amber-500 border-yellow-300 text-white" :
+                      result.grade === "C" 
+                        ? "bg-gradient-to-br from-orange-500 to-red-500 border-orange-400 text-white" :
+                      result.grade === "D" 
+                        ? "bg-gradient-to-br from-red-500 to-rose-600 border-red-400 text-white" :
+                      "bg-gradient-to-br from-red-600 to-red-800 border-red-500 text-white"
+                    }`}>
+                      {/* Decorative pattern */}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+                      <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full -ml-12 -mb-12"></div>
+                      
+                      <div className="relative p-6 flex flex-col items-center justify-center h-full">
+                        <div className="mb-2 p-2 rounded-full bg-white/20 backdrop-blur-sm">
+                          <Award className="h-6 w-6" />
+                        </div>
+                        <div className="text-6xl font-black tracking-tight mb-1 drop-shadow-lg">
+                          {result.grade}
+                        </div>
+                        <div className="text-xs font-semibold uppercase tracking-widest opacity-90">
+                          Grade
+                        </div>
+                        <div className="mt-3 text-xs opacity-75">
+                          {result.grade === "A" ? "Excellent" :
+                           result.grade === "B" ? "Good" :
+                           result.grade === "C" ? "Moderate" :
+                           result.grade === "D" ? "Poor" : "Critical"}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* 2. Stats Grid (Top Overview) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div className="p-4 bg-red-50/50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-red-600 dark:text-red-400 font-bold text-3xl">{result.stats.critical}</span>
+                  <span className="text-red-600 dark:text-red-400 font-bold text-3xl">{result.findingsSummary.critical}</span>
                   <span className="text-xs text-red-600/80 dark:text-red-400/80 uppercase font-bold tracking-wider mt-1">Critical</span>
                 </div>
                 <div className="p-4 bg-orange-50/50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-900/50 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-orange-600 dark:text-orange-400 font-bold text-3xl">{result.stats.high}</span>
+                  <span className="text-orange-600 dark:text-orange-400 font-bold text-3xl">{result.findingsSummary.high}</span>
                   <span className="text-xs text-orange-600/80 dark:text-orange-400/80 uppercase font-bold tracking-wider mt-1">High</span>
                 </div>
                 <div className="p-4 bg-yellow-50/50 dark:bg-yellow-900/20 border border-yellow-100 dark:border-yellow-900/50 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-yellow-600 dark:text-yellow-400 font-bold text-3xl">{result.stats.medium}</span>
+                  <span className="text-yellow-600 dark:text-yellow-400 font-bold text-3xl">{result.findingsSummary.medium}</span>
                   <span className="text-xs text-yellow-600/80 dark:text-yellow-400/80 uppercase font-bold tracking-wider mt-1">Medium</span>
                 </div>
                 <div className="p-4 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-blue-600 dark:text-blue-400 font-bold text-3xl">{result.stats.low}</span>
+                  <span className="text-blue-600 dark:text-blue-400 font-bold text-3xl">{result.findingsSummary.low}</span>
                   <span className="text-xs text-blue-600/80 dark:text-blue-400/80 uppercase font-bold tracking-wider mt-1">Low</span>
+                </div>
+                <div className="p-4 bg-neutral-50/50 dark:bg-neutral-900/20 border border-neutral-100 dark:border-neutral-900/50 rounded-lg flex flex-col items-center justify-center">
+                  <span className="text-neutral-600 dark:text-neutral-400 font-bold text-3xl">{result.findingsSummary.informational}</span>
+                  <span className="text-xs text-neutral-600/80 dark:text-neutral-400/80 uppercase font-bold tracking-wider mt-1">Info</span>
                 </div>
               </div>
 
@@ -916,10 +1224,10 @@ export function CodeAnalyzer() {
               <div>
                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
                    <Bug className="h-5 w-5" />
-                   Vulnerability Report
+                   Security Findings
                  </h3>
 
-                 {result.vulnerabilities.length === 0 ? (
+                 {result.findings.length === 0 ? (
                     <div className="p-8 text-center border-2 border-dashed border-green-200 rounded-xl bg-green-50/50">
                         <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-3" />
                         <h4 className="font-bold text-green-800 text-lg">All Clear!</h4>
@@ -928,44 +1236,171 @@ export function CodeAnalyzer() {
                  ) : (
                    <>
                      <SeveritySection 
-                       severity="Critical" 
-                       count={result.stats.critical} 
-                       vulnerabilities={result.vulnerabilities.filter(v => v.severity === "Critical")}
+                       severity="CRITICAL" 
+                       count={result.findingsSummary.critical} 
+                       findings={result.findings.filter(f => f.severity === "CRITICAL")}
                        icon={AlertOctagon}
                        colorClass="text-red-600"
                        bgClass="bg-red-50/50 dark:bg-red-900/20"
                        borderClass="border-l-red-500"
+                       originalCode={getCurrentCode()}
                      />
                      <SeveritySection 
-                       severity="High" 
-                       count={result.stats.high} 
-                       vulnerabilities={result.vulnerabilities.filter(v => v.severity === "High")}
+                       severity="HIGH" 
+                       count={result.findingsSummary.high} 
+                       findings={result.findings.filter(f => f.severity === "HIGH")}
                        icon={ShieldAlert}
                        colorClass="text-orange-600"
                        bgClass="bg-orange-50/50 dark:bg-orange-900/20"
                        borderClass="border-l-orange-500"
+                       originalCode={getCurrentCode()}
                      />
                      <SeveritySection 
-                       severity="Medium" 
-                       count={result.stats.medium} 
-                       vulnerabilities={result.vulnerabilities.filter(v => v.severity === "Medium")}
+                       severity="MEDIUM" 
+                       count={result.findingsSummary.medium} 
+                       findings={result.findings.filter(f => f.severity === "MEDIUM")}
                        icon={AlertTriangle}
                        colorClass="text-yellow-600"
                        bgClass="bg-yellow-50/50 dark:bg-yellow-900/20"
                        borderClass="border-l-yellow-500"
+                       originalCode={getCurrentCode()}
                      />
                      <SeveritySection 
-                       severity="Low" 
-                       count={result.stats.low} 
-                       vulnerabilities={result.vulnerabilities.filter(v => v.severity === "Low")}
+                       severity="LOW" 
+                       count={result.findingsSummary.low} 
+                       findings={result.findings.filter(f => f.severity === "LOW")}
                        icon={Info}
                        colorClass="text-blue-600"
                        bgClass="bg-blue-50/50 dark:bg-blue-900/20"
                        borderClass="border-l-blue-500"
+                       originalCode={getCurrentCode()}
+                     />
+                     <SeveritySection 
+                       severity="INFORMATIONAL" 
+                       count={result.findingsSummary.informational} 
+                       findings={result.findings.filter(f => f.severity === "INFORMATIONAL")}
+                       icon={Info}
+                       colorClass="text-neutral-600"
+                       bgClass="bg-neutral-50/50 dark:bg-neutral-900/20"
+                       borderClass="border-l-neutral-500"
+                       originalCode={getCurrentCode()}
                      />
                    </>
                  )}
               </div>
+
+              {/* 4. Recommendations */}
+              {result.recommendations && result.recommendations.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+                    <ShieldAlert className="h-5 w-5" />
+                    Recommendations
+                  </h3>
+                  <div className="space-y-3">
+                    {result.recommendations.map((rec, idx) => (
+                      <div key={idx} className={`p-4 rounded-lg border-l-4 ${
+                        rec.priority === "High" ? "bg-red-50/50 dark:bg-red-900/20 border-red-500" :
+                        rec.priority === "Medium" ? "bg-yellow-50/50 dark:bg-yellow-900/20 border-yellow-500" :
+                        "bg-blue-50/50 dark:bg-blue-900/20 border-blue-500"
+                      }`}>
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-bold text-base">{rec.title}</h4>
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            rec.priority === "High" ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" :
+                            rec.priority === "Medium" ? "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                            "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          }`}>
+                            {rec.priority} Priority
+                          </span>
+                        </div>
+                        <p className="text-sm opacity-90 mb-2">{rec.description}</p>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 italic">{rec.rationale}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 5. Gas Optimizations */}
+              {result.gasOptimizations && result.gasOptimizations.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+                    <Wand2 className="h-5 w-5" />
+                    Gas Optimizations
+                  </h3>
+                  <div className="space-y-3">
+                    {result.gasOptimizations.map((opt, idx) => (
+                      <div key={idx} className="p-4 rounded-lg border bg-neutral-50/50 dark:bg-neutral-900/20">
+                        <div className="flex items-start justify-between mb-2">
+                          <h4 className="font-bold text-base">{opt.location}</h4>
+                          <span className="text-xs px-2 py-1 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                            {opt.estimatedSavings}
+                          </span>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <div className="text-xs font-bold uppercase mb-1 text-red-600 opacity-80">Current Approach</div>
+                            <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
+                              {opt.currentApproach}
+                            </code>
+                          </div>
+                          <div>
+                            <div className="text-xs font-bold uppercase mb-1 text-green-600 opacity-80">Optimized Approach</div>
+                            <code className="text-sm font-mono block whitespace-pre-wrap bg-neutral-100 dark:bg-neutral-950 p-2 rounded">
+                              {opt.optimizedApproach}
+                            </code>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 6. Code Quality Observations */}
+              {result.codeQualityObservations && result.codeQualityObservations.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+                    <Info className="h-5 w-5" />
+                    Code Quality Observations
+                  </h3>
+                  <ul className="space-y-2 list-disc list-inside">
+                    {result.codeQualityObservations.map((obs, idx) => (
+                      <li key={idx} className="text-sm text-neutral-600 dark:text-neutral-400">{obs}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* 7. Positive Findings */}
+              {result.positiveFindings && result.positiveFindings.length > 0 && (
+                <div>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    Positive Findings
+                  </h3>
+                  <div className="p-4 rounded-lg border border-green-200 bg-green-50/50 dark:bg-green-900/20">
+                    <ul className="space-y-2 list-disc list-inside">
+                      {result.positiveFindings.map((finding, idx) => (
+                        <li key={idx} className="text-sm text-green-700 dark:text-green-400">{finding}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* 8. Next Steps */}
+              {result.nextSteps && (
+                <div>
+                  <h3 className="font-bold text-xl mb-4 flex items-center gap-2">
+                    <ArrowRight className="h-5 w-5" />
+                    Next Steps
+                  </h3>
+                  <div className="p-4 rounded-lg border bg-blue-50/50 dark:bg-blue-900/20">
+                    <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-line">{result.nextSteps}</p>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
