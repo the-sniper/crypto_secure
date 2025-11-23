@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ShieldCheck, AlertTriangle, Zap, Code, Lock, Terminal, FileText, CheckCircle, ArrowRight, Wand2, FileCode, Shield, Activity, Gauge, LayoutGrid, Sparkles } from "lucide-react";
@@ -140,12 +141,7 @@ export default function Home() {
     <div className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-blue-100">
       <header className="sticky top-0 z-50 w-full border-b border-neutral-100 bg-white/80 backdrop-blur-xl">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="bg-blue-600 p-1.5 rounded-lg shadow-lg shadow-blue-600/20">
-                <ShieldCheck className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-neutral-900">CryptoSecure</span>
-          </div>
+          <Logo />
           <Link href="/auditor">
             <Button className="bg-neutral-900 text-white hover:bg-neutral-800 transition-all hover:scale-105 shadow-lg shadow-neutral-900/20">Get Started</Button>
           </Link>

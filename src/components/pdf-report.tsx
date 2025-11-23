@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#7C3AED', // Purple-600
+    color: '#2563EB', // Blue-600
   },
   headerSubtitle: {
     fontSize: 10,
@@ -247,7 +247,7 @@ export const PdfReport: React.FC<PdfReportProps> = ({ result }) => {
         {/* Executive Summary & Score */}
         <View style={styles.summaryContainer}>
           <View style={styles.execSummary}>
-            <Text style={[styles.label, { color: '#7C3AED' }]}>Executive Summary</Text>
+            <Text style={[styles.label, { color: '#2563EB' }]}>Executive Summary</Text>
             <Text style={styles.text}>{result.executiveSummary}</Text>
           </View>
           

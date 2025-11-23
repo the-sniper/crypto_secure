@@ -31,6 +31,7 @@ import { CodeDiffViewer } from "@/components/code-diff-viewer";
 import { HackerModeResults } from "@/components/hacker-mode-results";
 import { pdf } from "@react-pdf/renderer";
 import { PdfReport } from "@/components/pdf-report";
+import { SimpleTooltip } from "@/components/ui/simple-tooltip";
 
 // Helper to map severity to display name
 const getSeverityDisplayName = (severity: string): string => {
@@ -803,13 +804,15 @@ export function CodeAnalyzer() {
 
   const handleHackerMode = async () => {
     const currentCode = getCurrentCode();
-    if (!currentCode.trim() || !result) {
+    if (!currentCode.trim()) {
       return;
     }
 
     setIsHacking(true);
     setHackerResult(null);
     setHackerStep(0);
+    setShowDiff(false);
+    setIsEditingFix(false);
 
     try {
       const language = activeTab === "snippet" && snippetLanguage 
@@ -831,7 +834,7 @@ export function CodeAnalyzer() {
         body: JSON.stringify({ 
           code: currentCode,
           language: language,
-          originalVulnerabilities: result.findings
+          originalVulnerabilities: result?.findings || []
         }),
       });
 
@@ -897,7 +900,7 @@ export function CodeAnalyzer() {
                   onClick={() => handleTabSwitch("upload")}
                   className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
                     activeTab === "upload"
-                      ? "border-purple-600 text-purple-600 bg-purple-50"
+                      ? "border-blue-600 text-blue-600 bg-blue-50"
                       : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
                   }`}
                 >
@@ -908,7 +911,7 @@ export function CodeAnalyzer() {
                   onClick={() => handleTabSwitch("snippet")}
                   className={`px-6 py-3 font-medium text-sm transition-all border-b-2 flex items-center gap-2 ${
                     activeTab === "snippet"
-                      ? "border-purple-600 text-purple-600 bg-purple-50"
+                      ? "border-blue-600 text-blue-600 bg-blue-50"
                       : "border-transparent text-neutral-600 hover:text-neutral-900 hover:bg-neutral-50"
                   }`}
                 >
@@ -919,7 +922,7 @@ export function CodeAnalyzer() {
 
               {/* Scan in Progress */}
               {isAnalyzing ? (
-                <div className="border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
+                <div className="border-2 border-dashed border-blue-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
                   <div className="w-full max-w-xl space-y-6">
                     <div>
                       <h3 className="text-xl font-semibold text-neutral-900 mb-1">Scan in progress...</h3>
@@ -942,7 +945,7 @@ export function CodeAnalyzer() {
                                   <CheckCircle className="h-3.5 w-3.5 text-white" />
                                 </div>
                               ) : isActive ? (
-                                <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
+                                <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shadow-sm">
                                   <Loader2 className="h-3.5 w-3.5 text-white animate-spin" />
                                 </div>
                               ) : (
@@ -958,7 +961,7 @@ export function CodeAnalyzer() {
                             {/* Step Content */}
                             <div className="flex-1 min-w-0">
                               <p className={`text-sm font-medium leading-tight ${
-                                isActive ? "text-purple-700" : 
+                                isActive ? "text-blue-700" : 
                                 isCompleted ? "text-green-700" : 
                                 "text-neutral-400"
                               }`}>
@@ -984,8 +987,8 @@ export function CodeAnalyzer() {
                       onDrop={handleDrop}
                       className={`relative border-2 border-dashed rounded-lg p-8 transition-colors h-[300px] flex items-center justify-center ${
                         isDragging
-                          ? "border-purple-500 bg-purple-50"
-                          : "border-purple-300 bg-neutral-50"
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-blue-300 bg-neutral-50"
                       }`}
                     >
                       <input
@@ -1000,13 +1003,13 @@ export function CodeAnalyzer() {
                         <div className="w-full h-full flex flex-col items-center justify-center p-4">
                           <div className="w-full max-w-md bg-white rounded-lg border border-neutral-200 shadow-sm overflow-hidden">
                             <div className="flex items-start gap-3 px-4 py-3">
-                              <div className="p-1.5 bg-purple-100 rounded flex-shrink-0">
-                                <FileText className="h-4 w-4 text-purple-600" />
+                              <div className="p-1.5 bg-blue-100 rounded flex-shrink-0">
+                                <FileText className="h-4 w-4 text-blue-600" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <p className="font-semibold text-neutral-900 truncate text-sm">{uploadedFile.name}</p>
-                                  <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded whitespace-nowrap">
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded whitespace-nowrap">
                                     Contract
                                   </span>
                                   <CheckCircle className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
@@ -1037,8 +1040,8 @@ export function CodeAnalyzer() {
                       ) : (
                         <div className="text-center space-y-4 w-full">
                           <div className="flex justify-center">
-                            <div className="p-4 bg-purple-100 rounded-full">
-                              <Upload className="h-8 w-8 text-purple-600" />
+                            <div className="p-4 bg-blue-100 rounded-full">
+                              <Upload className="h-8 w-8 text-blue-600" />
                             </div>
                           </div>
                           <div>
@@ -1048,7 +1051,7 @@ export function CodeAnalyzer() {
                             </p>
                             <button
                               onClick={() => fileInputRef.current?.click()}
-                              className="text-purple-600 hover:text-purple-700 underline font-medium text-sm cursor-pointer transition-colors"
+                              className="text-blue-600 hover:text-blue-700 underline font-medium text-sm cursor-pointer transition-colors"
                             >
                               Click to upload
                             </button>
@@ -1084,7 +1087,7 @@ export function CodeAnalyzer() {
                               }}
                               className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
                                 snippetLanguage === lang
-                                  ? "bg-purple-600 text-white"
+                                  ? "bg-blue-600 text-white"
                                   : "bg-neutral-100 text-neutral-700 hover:bg-neutral-200"
                               }`}
                             >
@@ -1096,7 +1099,7 @@ export function CodeAnalyzer() {
                       
           <Textarea
             placeholder="// Paste your smart contract code here..."
-                        className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-purple-500 focus-visible:ring-purple-500/20 focus-visible:ring-[2px]"
+                        className="h-[300px] font-mono text-sm resize-none overflow-y-auto focus-visible:border-blue-500 focus-visible:ring-blue-500/20 focus-visible:ring-[2px]"
                         value={snippetCode}
                         onChange={(e) => {
                           setSnippetCode(e.target.value);
@@ -1235,11 +1238,64 @@ export function CodeAnalyzer() {
                         Review Code Fixes
                     </Button>
                 )}
+            <SimpleTooltip content={
+              <div className="space-y-2">
+                <p className="font-semibold border-b border-white/20 pb-1 mb-1 flex items-center gap-2">
+                  <ShieldAlert className="h-4 w-4 text-purple-400" />
+                  Premium Audit
+                </p>
+                <p>Simulate advanced adversarial attacks and uncover deep logic flaws.</p>
+                <div>
+                  <span className="text-purple-300 font-medium">When to use:</span><br/>
+                  For comprehensive security assurance before release.
+                </div>
+                <div>
+                  <span className="text-purple-300 font-medium">Best suited for:</span><br/>
+                  Complex contracts and high-value targets.
+                </div>
+              </div>
+            }>
+            <Button 
+              onClick={handleHackerMode}
+              disabled={isAnalyzing || isHacking || !canScan()}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              size="lg"
+            >
+              {isHacking ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Running Exploits...
+                </>
+              ) : (
+                <>
+                  <ShieldAlert className="mr-2 h-4 w-4" />
+                  Activate Hacker Mode
+                </>
+              )}
+            </Button>
+            </SimpleTooltip>
+            <SimpleTooltip content={
+              <div className="space-y-2">
+                <p className="font-semibold border-b border-white/20 pb-1 mb-1 flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-blue-400" />
+                  Standard Audit
+                </p>
+                <p>Detect known vulnerabilities and pattern violations.</p>
+                <div>
+                  <span className="text-blue-300 font-medium">When to use:</span><br/>
+                  For instant feedback during the coding process.
+                </div>
+                <div>
+                  <span className="text-blue-300 font-medium">Best suited for:</span><br/>
+                  Catching standard bugs and ensuring best practices.
+                </div>
+              </div>
+            }>
             <Button 
               onClick={handleAnalyze} 
-                disabled={isAnalyzing || !canScan()}
+                disabled={isAnalyzing || isHacking || !canScan()}
               size="lg"
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
             >
               {isAnalyzing ? (
                 <>
@@ -1250,6 +1306,7 @@ export function CodeAnalyzer() {
                 "Analyze Security"
               )}
             </Button>
+            </SimpleTooltip>
           </div>
           )}
 
@@ -1266,13 +1323,13 @@ export function CodeAnalyzer() {
               {/* 1. Executive Summary, Score & Grade - Redesigned */}
               <div className="relative">
                 {/* Background gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 dark:from-purple-950/20 dark:via-blue-950/20 dark:to-indigo-950/20 rounded-2xl -z-10"></div>
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-100 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-blue-900/20 rounded-2xl -z-10"></div>
                 
                 <div className="grid gap-6 lg:grid-cols-12 p-6">
                   {/* Executive Summary - Takes more space */}
                   <div className="lg:col-span-7 space-y-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg">
+                      <div className="p-2.5 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg">
                         <FileCheck className="h-5 w-5" />
                       </div>
                       <h3 className="font-bold text-xl text-neutral-900 dark:text-neutral-100">Executive Summary</h3>
@@ -1379,6 +1436,30 @@ export function CodeAnalyzer() {
                   <span className="text-xs text-neutral-600/80 dark:text-neutral-400/80 uppercase font-bold tracking-wider mt-1">Info</span>
                 </div>
               </div>
+
+              {/* Hacker Mode Section - Moved to be more prominent */}
+              {!isHacking && !hackerResult && (
+                <div className="p-6 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="text-lg font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                        🧠 Hacker Mode (Premium Audit)
+                      </h3>
+                      <p className="text-sm text-blue-700 dark:text-blue-300">
+                        Activate our AI-powered adversarial analysis to discover novel attack vectors that static analysis might miss. 
+                      </p>
+                    </div>
+                    <Button
+                      onClick={handleHackerMode}
+                      disabled={isAnalyzing}
+                      size="lg"
+                      className="bg-blue-600 hover:bg-blue-700 text-white whitespace-nowrap"
+                    >
+                      🧠 Activate Hacker Mode
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* 3. Detailed Findings (Accordions) */}
               <div>
@@ -1565,34 +1646,11 @@ export function CodeAnalyzer() {
             </div>
           )}
 
-          {/* Hacker Mode Section */}
-          {result && !showDiff && !isHacking && !hackerResult && (
-            <div className="mt-8 p-6 bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-2 border-purple-200 dark:border-purple-800 rounded-xl">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    🧠 Hacker Mode (AI Red Team)
-                  </h3>
-                  <p className="text-sm text-purple-700 dark:text-purple-300">
-                    Activate our AI-powered adversarial analysis to discover novel attack vectors that static analysis might miss. 
-                    Our hacker agent will attempt to exploit your contract using creative strategies.
-                  </p>
-                </div>
-                <Button
-                  onClick={handleHackerMode}
-                  disabled={isAnalyzing || !result}
-                  size="lg"
-                  className="bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap"
-                >
-                  🧠 Activate Hacker Mode
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Hacker Mode Section - Removed from bottom */}
 
           {/* Hacker Mode Progress */}
           {isHacking && (
-            <div className="mt-8 border-2 border-dashed border-purple-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
+            <div className="mt-8 border-2 border-dashed border-blue-300 rounded-lg p-8 bg-neutral-50 h-[300px] flex items-center justify-center">
               <div className="w-full max-w-xl space-y-6">
                 <div>
                   <h3 className="text-xl font-semibold text-neutral-900 mb-2">Hacker Mode Analysis...</h3>
@@ -1613,7 +1671,7 @@ export function CodeAnalyzer() {
                               <CheckCircle className="h-3 w-3 text-white" />
                             </div>
                           ) : isActive ? (
-                            <div className="w-5 h-5 rounded-full bg-purple-600 flex items-center justify-center shadow-sm">
+                            <div className="w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center shadow-sm">
                               <Loader2 className="h-3 w-3 text-white animate-spin" />
                   </div>
                 ) : (
@@ -1627,7 +1685,7 @@ export function CodeAnalyzer() {
                         </div>
                         <div className="flex-1 pb-2">
                           <p className={`text-sm font-medium leading-tight ${
-                            isActive ? "text-purple-700" :
+                            isActive ? "text-blue-700" :
                             isCompleted ? "text-green-700" :
                             "text-neutral-400"
                           }`}>
