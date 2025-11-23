@@ -59,6 +59,38 @@ Suggests specific fixes → Developer implements improvements
 
 ---
 
+## Setup Instructions
+
+### Prerequisites
+- Node.js 18+ installed
+- OpenAI API key (for Hacker Mode feature)
+
+### Installation
+
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment variables:**
+   
+   Create a `.env.local` file in the root directory:
+   ```bash
+   OPENAI_API_KEY=your_openai_api_key_here
+   ```
+   
+   Get your OpenAI API key from: https://platform.openai.com/api-keys
+   
+   **Note:** The regular security scan works without an API key, but Hacker Mode requires it.
+
+3. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser:**
+   Navigate to `http://localhost:3000`
+
 ## Technology Stack
 
 **Frontend:**
@@ -68,9 +100,9 @@ Suggests specific fixes → Developer implements improvements
 - Tailwind CSS for styling
 
 **Backend/AI:**
-- Anthropic Claude API for code analysis
+- OpenAI GPT-4o API for AI-powered analysis (Hacker Mode)
 - Custom vulnerability database based on TONScanner research
-- TON SDK for contract validation
+- Static analysis engine for initial vulnerability detection
 
 **Deployment:**
 - Vercel for hosting
