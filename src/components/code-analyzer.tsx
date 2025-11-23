@@ -1303,7 +1303,10 @@ export function CodeAnalyzer() {
                   Analyzing Logic...
                 </>
               ) : (
-                "Analyze Security"
+                <>
+                  <Shield className="mr-2 h-4 w-4" />
+                  Analyze Security
+                </>
               )}
             </Button>
             </SimpleTooltip>
